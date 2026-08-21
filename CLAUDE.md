@@ -15,8 +15,8 @@ Source of truth: `ecommerce-boilerplate-spec.md`. Build in the phases listed the
 
 - [x] Phase 1 — Foundation (monorepo, schema + migrations, auth, RBAC, settings +
       feature flags, admin shell)
-- [ ] Phase 2 — Catalog
-- [ ] Phase 3 — Inventory
+- [x] Phase 2 — Catalog (products/variants/images, categories, collections, media)
+- [x] Phase 3 — Inventory (stock, race-safe reservations, low-stock, PGlite tests)
 - [ ] Phase 4 — Cart → Checkout → Orders
 - [ ] Phase 5 — Promotions, shipping, tax
 - [ ] Phase 6 — Customers
