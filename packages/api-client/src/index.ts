@@ -114,6 +114,70 @@ export type PublicCollectionPage = {
   products: Paginated<PublicProductListItem>;
 };
 
+// ── Cart & checkout payloads (Phase 4; mirror core's cart/checkout services) ──
+
+export type CartItemView = {
+  variantId: string;
+  quantity: number;
+  /** Snapshot price (minor units) captured when the item was added. */
+  unitPrice: number;
+  lineTotal: number;
+  productId: string;
+  productTitle: string;
+  productSlug: string;
+  variantTitle: string | null;
+  sku: string | null;
+  imageUrl: string | null;
+  /** Current catalog price — lets the storefront flag price changes. */
+  currentPrice: number | null;
+  inStock: boolean;
+};
+
+export type CartView = {
+  id: string;
+  /** Opaque session token — store client-side and pass to every cart call. */
+  token: string;
+  status: "active" | "converted" | "abandoned" | "expired";
+  currency: string;
+  /** ISO timestamp (Dates serialize to strings over JSON). */
+  expiresAt: string;
+  items: CartItemView[];
+  itemCount: number;
+  subtotal: number;
+};
+
+export type CheckoutAddress = {
+  firstName?: string;
+  lastName?: string;
+  company?: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  region?: string;
+  postalCode: string;
+  /** ISO 3166-1 alpha-2. */
+  country: string;
+  phone?: string;
+};
+
+export type CheckoutRequest = {
+  cartToken: string;
+  email: string;
+  shippingAddress: CheckoutAddress;
+  /** Defaults to the shipping address when omitted. */
+  billingAddress?: CheckoutAddress;
+};
+
+export type CheckoutResult = {
+  orderId: string;
+  orderNumber: string;
+  /** Hand to Stripe.js (Elements / confirmPayment) to collect payment. */
+  clientSecret: string;
+  /** Minor units — what the PaymentIntent will charge. */
+  amount: number;
+  currency: string;
+};
+
 export type PublicProductsQuery = {
   page?: number;
   pageSize?: number;
@@ -215,6 +279,37 @@ export function createApiClient(opts: ApiClientOptions) {
           "GET",
           `/api/public/collections/${encodeURIComponent(slug)}${toQueryString(query)}`,
         ),
+    },
+    cart: {
+      /** Create an anonymous cart; persist the returned token client-side. */
+      create: () => request<CartView>(opts, "POST", "/api/public/cart"),
+      /** Current cart contents (404 for unknown tokens, cart_expired when stale). */
+      get: (token: string) =>
+        request<CartView>(opts, "GET", `/api/public/cart/${encodeURIComponent(token)}`),
+      /** Add a variant (merges into an existing line); returns the updated cart. */
+      addItem: (token: string, input: { variantId: string; quantity: number }) =>
+        request<CartView>(
+          opts,
+          "POST",
+          `/api/public/cart/${encodeURIComponent(token)}/items`,
+          input,
+        ),
+      /** Set line quantities (0 removes a line); returns the updated cart. */
+      updateItems: (token: string, input: { items: { variantId: string; quantity: number }[] }) =>
+        request<CartView>(
+          opts,
+          "PATCH",
+          `/api/public/cart/${encodeURIComponent(token)}/items`,
+          input,
+        ),
+    },
+    checkout: {
+      /**
+       * Start checkout: reserves stock, creates the pending order, and returns
+       * the Stripe PaymentIntent client secret to confirm payment with.
+       */
+      create: (input: CheckoutRequest) =>
+        request<CheckoutResult>(opts, "POST", "/api/public/checkout", input),
     },
   };
 }
