@@ -1,0 +1,9 @@
+{
+  "name": "@repo/storefront",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Placeholder. The storefront is custom per client and is NOT part of this boilerplate — build it against @repo/api-client. See README.md.",
+  "dependencies": {
+    "@repo/api-client": "workspace:*"
+  }
+}
