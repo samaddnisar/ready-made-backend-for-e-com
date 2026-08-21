@@ -21,12 +21,20 @@ export const moneySchema = z.number().int().min(0);
 
 export const emailSchema = z.email().max(320);
 
-export const paginationQuerySchema = z
-  .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  })
-  .strict();
+const paginationFields = {
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+};
+
+/** Admin queries: reject unknown fields (§9). */
+export const paginationQuerySchema = z.object(paginationFields).strict();
+
+/**
+ * Public storefront queries: STRIP unknown fields instead of rejecting —
+ * public URLs routinely carry tracking params (utm_*, fbclid, gclid) that
+ * must not turn into 422s. Known fields are still fully validated.
+ */
+export const loosePaginationQuerySchema = z.object(paginationFields);
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 
