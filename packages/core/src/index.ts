@@ -5,6 +5,7 @@ export * from "./settings/service";
 export * from "./validation/index";
 export * from "./catalog/products";
 export * from "./catalog/taxonomy";
+export * from "./inventory/service";
 export * from "./media/service";
 export * from "./utils/slug";
 export { getDb, setDb, type Db } from "./db/client";

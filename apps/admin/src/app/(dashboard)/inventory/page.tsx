@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/page-placeholder";
-import { requireReadPage } from "@/lib/auth";
+import { can, requireReadPage } from "@/lib/auth";
+import { PageHeader } from "@/components/page-header";
+import { InventoryClient } from "./inventory-client";
 
 export const metadata: Metadata = { title: "Inventory" };
 
-export default async function Page() {
-  await requireReadPage("inventory");
-  return <PagePlaceholder title={"Inventory"} description={"Stock levels, low-stock view and adjustments with a reason."} phase={3} />;
+export default async function InventoryPage() {
+  const admin = await requireReadPage("inventory");
+  const canWrite = can(admin, "inventory", "update");
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Inventory"
+        description="Stock levels across all variants. Available = on hand − reserved by active checkouts."
+      />
+      <InventoryClient canWrite={canWrite} />
+    </div>
+  );
 }
