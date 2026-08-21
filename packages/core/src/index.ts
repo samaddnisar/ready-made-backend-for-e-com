@@ -12,6 +12,8 @@ export * from "./inventory/service";
 export * from "./media/service";
 export * from "./orders/service";
 export * from "./orders/state-machine";
+export * from "./promotions/service";
+export * from "./shipping/service";
 export * from "./webhooks/stripe";
 export * from "./utils/slug";
 export { getDb, setDb, type Db } from "./db/client";
