@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -46,9 +47,10 @@ export const reviews = pgTable(
   (t) => [
     index("reviews_product_id_idx").on(t.productId),
     index("reviews_status_idx").on(t.status),
+    index("reviews_order_id_idx").on(t.orderId),
     uniqueIndex("reviews_customer_product_idx").on(t.customerId, t.productId),
   ],
-);
+).enableRLS();
 
 // ── Wishlists (feature: wishlists) ───────────────────────────
 
@@ -63,7 +65,7 @@ export const wishlists = pgTable(
     ...timestamps(),
   },
   (t) => [index("wishlists_customer_id_idx").on(t.customerId)],
-);
+).enableRLS();
 
 export const wishlistItems = pgTable(
   "wishlist_items",
@@ -80,9 +82,10 @@ export const wishlistItems = pgTable(
   },
   (t) => [
     index("wishlist_items_wishlist_id_idx").on(t.wishlistId),
+    index("wishlist_items_variant_id_idx").on(t.variantId),
     uniqueIndex("wishlist_items_unique_idx").on(t.wishlistId, t.productId),
   ],
-);
+).enableRLS();
 
 // ── Gift cards (feature: gift_cards) ─────────────────────────
 
@@ -99,8 +102,11 @@ export const giftCards = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     ...timestamps(),
   },
-  (t) => [uniqueIndex("gift_cards_code_idx").on(t.code)],
-);
+  (t) => [
+    uniqueIndex("gift_cards_code_idx").on(t.code),
+    index("gift_cards_customer_id_idx").on(t.customerId),
+  ],
+).enableRLS();
 
 /** Money-path ledger: every balance change is a row. */
 export const giftCardTransactions = pgTable(
@@ -116,8 +122,11 @@ export const giftCardTransactions = pgTable(
     note: text("note"),
     ...timestamps(),
   },
-  (t) => [index("gift_card_transactions_gift_card_id_idx").on(t.giftCardId)],
-);
+  (t) => [
+    index("gift_card_transactions_gift_card_id_idx").on(t.giftCardId),
+    index("gift_card_transactions_order_id_idx").on(t.orderId),
+  ],
+).enableRLS();
 
 // ── Loyalty (feature: loyalty) ───────────────────────────────
 
@@ -132,7 +141,7 @@ export const loyaltyAccounts = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("loyalty_accounts_customer_id_idx").on(t.customerId)],
-);
+).enableRLS();
 
 export const loyaltyLedger = pgTable(
   "loyalty_ledger",
@@ -147,8 +156,11 @@ export const loyaltyLedger = pgTable(
     reason: text("reason").notNull(),
     ...timestamps(),
   },
-  (t) => [index("loyalty_ledger_account_id_idx").on(t.accountId)],
-);
+  (t) => [
+    index("loyalty_ledger_account_id_idx").on(t.accountId),
+    index("loyalty_ledger_order_id_idx").on(t.orderId),
+  ],
+).enableRLS();
 
 // ── CMS / Blog (feature: cms) ────────────────────────────────
 
@@ -166,8 +178,11 @@ export const cmsPages = pgTable(
     ...timestamps(),
     ...softDelete(),
   },
-  (t) => [uniqueIndex("cms_pages_slug_idx").on(t.slug), index("cms_pages_status_idx").on(t.status)],
-);
+  (t) => [
+    uniqueIndex("cms_pages_slug_idx").on(t.slug).where(sql`deleted_at is null`),
+    index("cms_pages_status_idx").on(t.status),
+  ],
+).enableRLS();
 
 export const blogPosts = pgTable(
   "blog_posts",
@@ -189,10 +204,10 @@ export const blogPosts = pgTable(
     ...softDelete(),
   },
   (t) => [
-    uniqueIndex("blog_posts_slug_idx").on(t.slug),
+    uniqueIndex("blog_posts_slug_idx").on(t.slug).where(sql`deleted_at is null`),
     index("blog_posts_status_idx").on(t.status),
   ],
-);
+).enableRLS();
 
 // ── Abandoned carts (feature: abandoned_cart) ────────────────
 
@@ -211,8 +226,11 @@ export const abandonedCarts = pgTable(
     }),
     ...timestamps(),
   },
-  (t) => [uniqueIndex("abandoned_carts_cart_id_idx").on(t.cartId)],
-);
+  (t) => [
+    uniqueIndex("abandoned_carts_cart_id_idx").on(t.cartId),
+    index("abandoned_carts_recovery_order_id_idx").on(t.recoveryOrderId),
+  ],
+).enableRLS();
 
 // ── Newsletter (feature: newsletter) ─────────────────────────
 
@@ -229,4 +247,4 @@ export const newsletterSubscribers = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("newsletter_subscribers_email_idx").on(t.email)],
-);
+).enableRLS();

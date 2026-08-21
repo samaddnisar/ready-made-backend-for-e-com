@@ -49,10 +49,10 @@ export function hasPermission(
 
 export const SUPER_ADMIN_PERMISSIONS: RolePermissions = { "*": ["*"] };
 
-/** Everything except managing admin users/roles and store settings. */
+/** Everything except managing admin users/roles and store settings (read-only there). */
 export const MANAGER_PERMISSIONS: RolePermissions = {
   "*": ["*"],
-  users: [],
+  users: ["read"],
   settings: ["read"],
 };
 

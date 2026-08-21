@@ -29,7 +29,7 @@ export const inventory = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("inventory_variant_id_idx").on(t.variantId)],
-);
+).enableRLS();
 
 /**
  * Row-per-hold so expired reservations can be found and released.
@@ -58,7 +58,7 @@ export const inventoryReservations = pgTable(
     index("inventory_reservations_cart_id_idx").on(t.cartId),
     index("inventory_reservations_expires_at_idx").on(t.expiresAt),
   ],
-);
+).enableRLS();
 
 /** Manual stock adjustments with a reason, for the audit trail. */
 export const inventoryAdjustments = pgTable(
@@ -74,4 +74,4 @@ export const inventoryAdjustments = pgTable(
     ...timestamps(),
   },
   (t) => [index("inventory_adjustments_variant_id_idx").on(t.variantId)],
-);
+).enableRLS();

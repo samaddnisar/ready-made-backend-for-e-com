@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -30,11 +31,12 @@ export const products = pgTable(
     ...softDelete(),
   },
   (t) => [
-    uniqueIndex("products_slug_idx").on(t.slug),
+    // Partial: soft-deleted rows release their slug for reuse.
+    uniqueIndex("products_slug_idx").on(t.slug).where(sql`deleted_at is null`),
     index("products_status_idx").on(t.status),
     index("products_title_idx").on(t.title),
   ],
-);
+).enableRLS();
 
 export const productVariants = pgTable(
   "product_variants",
@@ -57,9 +59,9 @@ export const productVariants = pgTable(
   },
   (t) => [
     index("product_variants_product_id_idx").on(t.productId),
-    uniqueIndex("product_variants_sku_idx").on(t.sku),
+    uniqueIndex("product_variants_sku_idx").on(t.sku).where(sql`deleted_at is null`),
   ],
-);
+).enableRLS();
 
 export const productImages = pgTable(
   "product_images",
@@ -74,8 +76,11 @@ export const productImages = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps(),
   },
-  (t) => [index("product_images_product_id_idx").on(t.productId)],
-);
+  (t) => [
+    index("product_images_product_id_idx").on(t.productId),
+    index("product_images_variant_id_idx").on(t.variantId),
+  ],
+).enableRLS();
 
 export const categories = pgTable(
   "categories",
@@ -93,10 +98,10 @@ export const categories = pgTable(
     ...softDelete(),
   },
   (t) => [
-    uniqueIndex("categories_slug_idx").on(t.slug),
+    uniqueIndex("categories_slug_idx").on(t.slug).where(sql`deleted_at is null`),
     index("categories_parent_id_idx").on(t.parentId),
   ],
-);
+).enableRLS();
 
 export const collections = pgTable(
   "collections",
@@ -114,8 +119,8 @@ export const collections = pgTable(
     ...timestamps(),
     ...softDelete(),
   },
-  (t) => [uniqueIndex("collections_slug_idx").on(t.slug)],
-);
+  (t) => [uniqueIndex("collections_slug_idx").on(t.slug).where(sql`deleted_at is null`)],
+).enableRLS();
 
 export const productCategories = pgTable(
   "product_categories",
@@ -131,7 +136,7 @@ export const productCategories = pgTable(
     primaryKey({ columns: [t.productId, t.categoryId] }),
     index("product_categories_category_id_idx").on(t.categoryId),
   ],
-);
+).enableRLS();
 
 export const productCollections = pgTable(
   "product_collections",
@@ -148,7 +153,7 @@ export const productCollections = pgTable(
     primaryKey({ columns: [t.productId, t.collectionId] }),
     index("product_collections_collection_id_idx").on(t.collectionId),
   ],
-);
+).enableRLS();
 
 /** Manual "related products" curation (related_products feature). */
 export const productRelations = pgTable(
@@ -163,4 +168,4 @@ export const productRelations = pgTable(
     position: integer("position").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.productId, t.relatedProductId] })],
-);
+).enableRLS();

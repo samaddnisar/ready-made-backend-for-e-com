@@ -25,7 +25,7 @@ export const roles = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("roles_name_idx").on(t.name)],
-);
+).enableRLS();
 
 export const adminUsers = pgTable(
   "admin_users",
@@ -45,7 +45,7 @@ export const adminUsers = pgTable(
     uniqueIndex("admin_users_auth_user_id_idx").on(t.authUserId),
     uniqueIndex("admin_users_email_idx").on(t.email),
   ],
-);
+).enableRLS();
 
 export type StoreAddress = {
   line1?: string;
@@ -76,7 +76,7 @@ export const settings = pgTable("settings", {
   featureFlags: jsonb("feature_flags").$type<FeatureFlags>().notNull().default({} as FeatureFlags),
   emailConfig: jsonb("email_config").$type<EmailConfig>(),
   ...timestamps(),
-});
+}).enableRLS();
 
 export const media = pgTable(
   "media",
@@ -96,7 +96,7 @@ export const media = pgTable(
     ...timestamps(),
   },
   (t) => [index("media_mime_type_idx").on(t.mimeType)],
-);
+).enableRLS();
 
 export const auditLog = pgTable(
   "audit_log",
@@ -118,7 +118,7 @@ export const auditLog = pgTable(
     index("audit_log_resource_idx").on(t.resource, t.resourceId),
     index("audit_log_created_at_idx").on(t.createdAt),
   ],
-);
+).enableRLS();
 
 /** Inbound webhook log — idempotency guard + debugging. */
 export const webhookEvents = pgTable(
@@ -139,4 +139,4 @@ export const webhookEvents = pgTable(
     uniqueIndex("webhook_events_source_event_id_idx").on(t.source, t.eventId),
     index("webhook_events_type_idx").on(t.type),
   ],
-);
+).enableRLS();

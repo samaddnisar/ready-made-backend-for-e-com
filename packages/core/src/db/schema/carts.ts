@@ -32,7 +32,7 @@ export const carts = pgTable(
     index("carts_status_idx").on(t.status),
     index("carts_expires_at_idx").on(t.expiresAt),
   ],
-);
+).enableRLS();
 
 export const cartItems = pgTable(
   "cart_items",
@@ -53,4 +53,4 @@ export const cartItems = pgTable(
     index("cart_items_cart_id_idx").on(t.cartId),
     uniqueIndex("cart_items_cart_variant_idx").on(t.cartId, t.variantId),
   ],
-);
+).enableRLS();

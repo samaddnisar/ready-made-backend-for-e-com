@@ -21,10 +21,12 @@ export const moneySchema = z.number().int().min(0);
 
 export const emailSchema = z.email().max(320);
 
-export const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-});
+export const paginationQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 

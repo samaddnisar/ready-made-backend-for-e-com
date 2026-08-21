@@ -21,7 +21,7 @@ export const payments = pgTable(
     uniqueIndex("payments_stripe_payment_intent_id_idx").on(t.stripePaymentIntentId),
     index("payments_order_id_idx").on(t.orderId),
   ],
-);
+).enableRLS();
 
 export const refunds = pgTable(
   "refunds",
@@ -41,4 +41,4 @@ export const refunds = pgTable(
     index("refunds_payment_id_idx").on(t.paymentId),
     uniqueIndex("refunds_stripe_refund_id_idx").on(t.stripeRefundId),
   ],
-);
+).enableRLS();

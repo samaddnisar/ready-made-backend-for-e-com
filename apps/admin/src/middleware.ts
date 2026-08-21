@@ -8,10 +8,25 @@ import { NextResponse, type NextRequest } from "next/server";
  * because the edge runtime can't open a Postgres connection.
  */
 
-const PUBLIC_PREFIXES = ["/login", "/api/public", "/api/webhooks", "/api/health", "/auth"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/unauthorized",
+  "/api/public",
+  "/api/webhooks",
+  "/api/health",
+  "/auth",
+];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/** Any early-return response must carry the refreshed auth cookies, or a
+ *  rotated refresh token is dropped and Supabase's reuse detection can
+ *  revoke the whole session. */
+function withAuthCookies(target: NextResponse, source: NextResponse): NextResponse {
+  source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
+  return target;
 }
 
 export async function middleware(request: NextRequest) {
@@ -45,22 +60,25 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic(pathname)) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: { code: "unauthorized", message: "Authentication required" } },
-        { status: 401 },
+      return withAuthCookies(
+        NextResponse.json(
+          { error: { code: "unauthorized", message: "Authentication required" } },
+          { status: 401 },
+        ),
+        response,
       );
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return withAuthCookies(NextResponse.redirect(url), response);
   }
 
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
-    return NextResponse.redirect(url);
+    return withAuthCookies(NextResponse.redirect(url), response);
   }
 
   return response;

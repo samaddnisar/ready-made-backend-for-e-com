@@ -33,7 +33,7 @@ export const discounts = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("discounts_code_idx").on(t.code), index("discounts_active_idx").on(t.isActive)],
-);
+).enableRLS();
 
 export const discountProducts = pgTable(
   "discount_products",
@@ -45,8 +45,11 @@ export const discountProducts = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
   },
-  (t) => [primaryKey({ columns: [t.discountId, t.productId] })],
-);
+  (t) => [
+    primaryKey({ columns: [t.discountId, t.productId] }),
+    index("discount_products_product_id_idx").on(t.productId),
+  ],
+).enableRLS();
 
 export const discountCategories = pgTable(
   "discount_categories",
@@ -58,8 +61,11 @@ export const discountCategories = pgTable(
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
   },
-  (t) => [primaryKey({ columns: [t.discountId, t.categoryId] })],
-);
+  (t) => [
+    primaryKey({ columns: [t.discountId, t.categoryId] }),
+    index("discount_categories_category_id_idx").on(t.categoryId),
+  ],
+).enableRLS();
 
 export const discountRedemptions = pgTable(
   "discount_redemptions",
@@ -77,6 +83,7 @@ export const discountRedemptions = pgTable(
   (t) => [
     index("discount_redemptions_discount_id_idx").on(t.discountId),
     index("discount_redemptions_customer_id_idx").on(t.customerId),
+    index("discount_redemptions_order_id_idx").on(t.orderId),
     uniqueIndex("discount_redemptions_order_idx").on(t.discountId, t.orderId),
   ],
-);
+).enableRLS();

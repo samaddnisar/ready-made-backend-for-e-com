@@ -22,38 +22,52 @@ export type AdminContext = {
   permissions: RolePermissions;
 };
 
+type AdminResolution =
+  | { status: "no_session" }
+  | { status: "not_admin" }
+  | { status: "ok"; context: AdminContext };
+
 /**
  * Resolve the signed-in admin (session → admin_users row → role).
- * Cached per request. Returns null when there's no session or the
- * auth user has no admin_users row (i.e. a customer account).
+ * Cached per request. "not_admin" means a valid Supabase session whose
+ * auth user has no admin_users row (e.g. a customer account).
  */
-export const getAdminContext = cache(async (): Promise<AdminContext | null> => {
+const resolveAdmin = cache(async (): Promise<AdminResolution> => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { status: "no_session" };
 
   const db = getDb();
   const row = await db.query.adminUsers.findFirst({
     where: eq(schema.adminUsers.authUserId, user.id),
     with: { role: true },
   });
-  if (!row) return null;
+  if (!row) return { status: "not_admin" };
 
   return {
-    authUserId: user.id,
-    adminUser: row,
-    roleName: row.role.name,
-    permissions: row.role.permissions,
+    status: "ok",
+    context: {
+      authUserId: user.id,
+      adminUser: row,
+      roleName: row.role.name,
+      permissions: row.role.permissions,
+    },
   };
 });
 
+export async function getAdminContext(): Promise<AdminContext | null> {
+  const resolution = await resolveAdmin();
+  return resolution.status === "ok" ? resolution.context : null;
+}
+
 /** For route handlers — throws AppError (mapped to the JSON envelope). */
 export async function requireAdmin(): Promise<AdminContext> {
-  const ctx = await getAdminContext();
-  if (!ctx) throw unauthorized();
-  return ctx;
+  const resolution = await resolveAdmin();
+  if (resolution.status === "no_session") throw unauthorized();
+  if (resolution.status === "not_admin") throw forbidden();
+  return resolution.context;
 }
 
 export async function requirePermission(resource: Resource, action: Action): Promise<AdminContext> {
@@ -62,11 +76,17 @@ export async function requirePermission(resource: Resource, action: Action): Pro
   return ctx;
 }
 
-/** For server components/pages — redirects instead of throwing. */
+/**
+ * For server components/pages — redirects instead of throwing.
+ * A signed-in user WITHOUT an admin_users row goes to /unauthorized
+ * (never back to /login — middleware bounces authed users off /login,
+ * which would loop forever).
+ */
 export async function requireAdminPage(): Promise<AdminContext> {
-  const ctx = await getAdminContext();
-  if (!ctx) redirect("/login");
-  return ctx;
+  const resolution = await resolveAdmin();
+  if (resolution.status === "no_session") redirect("/login");
+  if (resolution.status === "not_admin") redirect("/unauthorized");
+  return resolution.context;
 }
 
 export function can(ctx: AdminContext, resource: Resource, action: Action): boolean {

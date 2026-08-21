@@ -28,6 +28,7 @@ CREATE TABLE "categories" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "categories" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "collections" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
@@ -43,12 +44,14 @@ CREATE TABLE "collections" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "collections" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_categories" (
 	"product_id" uuid NOT NULL,
 	"category_id" uuid NOT NULL,
 	CONSTRAINT "product_categories_product_id_category_id_pk" PRIMARY KEY("product_id","category_id")
 );
 --> statement-breakpoint
+ALTER TABLE "product_categories" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_collections" (
 	"product_id" uuid NOT NULL,
 	"collection_id" uuid NOT NULL,
@@ -56,6 +59,7 @@ CREATE TABLE "product_collections" (
 	CONSTRAINT "product_collections_product_id_collection_id_pk" PRIMARY KEY("product_id","collection_id")
 );
 --> statement-breakpoint
+ALTER TABLE "product_collections" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_images" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_id" uuid NOT NULL,
@@ -67,6 +71,7 @@ CREATE TABLE "product_images" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "product_images" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_relations" (
 	"product_id" uuid NOT NULL,
 	"related_product_id" uuid NOT NULL,
@@ -74,6 +79,7 @@ CREATE TABLE "product_relations" (
 	CONSTRAINT "product_relations_product_id_related_product_id_pk" PRIMARY KEY("product_id","related_product_id")
 );
 --> statement-breakpoint
+ALTER TABLE "product_relations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "product_variants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_id" uuid NOT NULL,
@@ -90,6 +96,7 @@ CREATE TABLE "product_variants" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "product_variants" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "products" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" text NOT NULL,
@@ -106,6 +113,7 @@ CREATE TABLE "products" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "products" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "inventory" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"variant_id" uuid NOT NULL,
@@ -118,6 +126,7 @@ CREATE TABLE "inventory" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "inventory" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "inventory_adjustments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"variant_id" uuid NOT NULL,
@@ -128,6 +137,7 @@ CREATE TABLE "inventory_adjustments" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "inventory_adjustments" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "inventory_reservations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"variant_id" uuid NOT NULL,
@@ -141,6 +151,7 @@ CREATE TABLE "inventory_reservations" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "inventory_reservations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "addresses" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -161,6 +172,7 @@ CREATE TABLE "addresses" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "addresses" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "customers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"auth_user_id" uuid,
@@ -175,6 +187,7 @@ CREATE TABLE "customers" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "customers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "cart_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"cart_id" uuid NOT NULL,
@@ -185,6 +198,7 @@ CREATE TABLE "cart_items" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "cart_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "carts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid,
@@ -197,6 +211,7 @@ CREATE TABLE "carts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "carts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "order_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"order_id" uuid NOT NULL,
@@ -211,6 +226,7 @@ CREATE TABLE "order_items" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "order_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "order_status_history" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"order_id" uuid NOT NULL,
@@ -222,6 +238,7 @@ CREATE TABLE "order_status_history" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "order_status_history" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "orders" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"order_number" text NOT NULL,
@@ -244,6 +261,7 @@ CREATE TABLE "orders" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "orders" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "payments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"order_id" uuid NOT NULL,
@@ -256,6 +274,7 @@ CREATE TABLE "payments" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "payments" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "refunds" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"payment_id" uuid NOT NULL,
@@ -268,18 +287,21 @@ CREATE TABLE "refunds" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "refunds" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "discount_categories" (
 	"discount_id" uuid NOT NULL,
 	"category_id" uuid NOT NULL,
 	CONSTRAINT "discount_categories_discount_id_category_id_pk" PRIMARY KEY("discount_id","category_id")
 );
 --> statement-breakpoint
+ALTER TABLE "discount_categories" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "discount_products" (
 	"discount_id" uuid NOT NULL,
 	"product_id" uuid NOT NULL,
 	CONSTRAINT "discount_products_discount_id_product_id_pk" PRIMARY KEY("discount_id","product_id")
 );
 --> statement-breakpoint
+ALTER TABLE "discount_products" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "discount_redemptions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"discount_id" uuid NOT NULL,
@@ -289,6 +311,7 @@ CREATE TABLE "discount_redemptions" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "discount_redemptions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "discounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"code" text NOT NULL,
@@ -306,6 +329,7 @@ CREATE TABLE "discounts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "discounts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "shipping_rates" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"zone_id" uuid NOT NULL,
@@ -320,6 +344,7 @@ CREATE TABLE "shipping_rates" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "shipping_rates" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "shipping_zones" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
@@ -328,6 +353,7 @@ CREATE TABLE "shipping_zones" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "shipping_zones" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "tax_settings" (
 	"id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
 	"mode" "tax_mode" DEFAULT 'none' NOT NULL,
@@ -337,6 +363,7 @@ CREATE TABLE "tax_settings" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "tax_settings" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "admin_users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"auth_user_id" uuid NOT NULL,
@@ -348,6 +375,7 @@ CREATE TABLE "admin_users" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "admin_users" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "audit_log" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"admin_user_id" uuid,
@@ -360,6 +388,7 @@ CREATE TABLE "audit_log" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "audit_log" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "media" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"url" text NOT NULL,
@@ -375,6 +404,7 @@ CREATE TABLE "media" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "media" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "roles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
@@ -384,6 +414,7 @@ CREATE TABLE "roles" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "roles" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "settings" (
 	"id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
 	"store_name" text DEFAULT 'My Store' NOT NULL,
@@ -398,6 +429,7 @@ CREATE TABLE "settings" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "settings" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "webhook_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"source" text DEFAULT 'stripe' NOT NULL,
@@ -411,6 +443,7 @@ CREATE TABLE "webhook_events" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "webhook_events" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "abandoned_carts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"cart_id" uuid NOT NULL,
@@ -422,6 +455,7 @@ CREATE TABLE "abandoned_carts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "abandoned_carts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "blog_posts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" text NOT NULL,
@@ -441,6 +475,7 @@ CREATE TABLE "blog_posts" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "blog_posts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "cms_pages" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" text NOT NULL,
@@ -455,6 +490,7 @@ CREATE TABLE "cms_pages" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+ALTER TABLE "cms_pages" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "gift_card_transactions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"gift_card_id" uuid NOT NULL,
@@ -465,6 +501,7 @@ CREATE TABLE "gift_card_transactions" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "gift_card_transactions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "gift_cards" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"code" text NOT NULL,
@@ -478,6 +515,7 @@ CREATE TABLE "gift_cards" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "gift_cards" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "loyalty_accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -486,6 +524,7 @@ CREATE TABLE "loyalty_accounts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "loyalty_accounts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "loyalty_ledger" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"account_id" uuid NOT NULL,
@@ -496,6 +535,7 @@ CREATE TABLE "loyalty_ledger" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "loyalty_ledger" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "newsletter_subscribers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" text NOT NULL,
@@ -507,6 +547,7 @@ CREATE TABLE "newsletter_subscribers" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "newsletter_subscribers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "reviews" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_id" uuid NOT NULL,
@@ -520,6 +561,7 @@ CREATE TABLE "reviews" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "reviews" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "wishlist_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"wishlist_id" uuid NOT NULL,
@@ -529,6 +571,7 @@ CREATE TABLE "wishlist_items" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "wishlist_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "wishlists" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"customer_id" uuid NOT NULL,
@@ -537,6 +580,7 @@ CREATE TABLE "wishlists" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "wishlists" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parent_id_categories_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."categories"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -586,15 +630,16 @@ ALTER TABLE "wishlist_items" ADD CONSTRAINT "wishlist_items_wishlist_id_wishlist
 ALTER TABLE "wishlist_items" ADD CONSTRAINT "wishlist_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "wishlist_items" ADD CONSTRAINT "wishlist_items_variant_id_product_variants_id_fk" FOREIGN KEY ("variant_id") REFERENCES "public"."product_variants"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "wishlists" ADD CONSTRAINT "wishlists_customer_id_customers_id_fk" FOREIGN KEY ("customer_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "categories_slug_idx" ON "categories" USING btree ("slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "categories_slug_idx" ON "categories" USING btree ("slug") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "categories_parent_id_idx" ON "categories" USING btree ("parent_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "collections_slug_idx" ON "collections" USING btree ("slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "collections_slug_idx" ON "collections" USING btree ("slug") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "product_categories_category_id_idx" ON "product_categories" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "product_collections_collection_id_idx" ON "product_collections" USING btree ("collection_id");--> statement-breakpoint
 CREATE INDEX "product_images_product_id_idx" ON "product_images" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "product_images_variant_id_idx" ON "product_images" USING btree ("variant_id");--> statement-breakpoint
 CREATE INDEX "product_variants_product_id_idx" ON "product_variants" USING btree ("product_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "product_variants_sku_idx" ON "product_variants" USING btree ("sku");--> statement-breakpoint
-CREATE UNIQUE INDEX "products_slug_idx" ON "products" USING btree ("slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "product_variants_sku_idx" ON "product_variants" USING btree ("sku") WHERE deleted_at is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "products_slug_idx" ON "products" USING btree ("slug") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "products_status_idx" ON "products" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "products_title_idx" ON "products" USING btree ("title");--> statement-breakpoint
 CREATE UNIQUE INDEX "inventory_variant_id_idx" ON "inventory" USING btree ("variant_id");--> statement-breakpoint
@@ -603,8 +648,8 @@ CREATE INDEX "inventory_reservations_variant_id_idx" ON "inventory_reservations"
 CREATE INDEX "inventory_reservations_cart_id_idx" ON "inventory_reservations" USING btree ("cart_id");--> statement-breakpoint
 CREATE INDEX "inventory_reservations_expires_at_idx" ON "inventory_reservations" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "addresses_customer_id_idx" ON "addresses" USING btree ("customer_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "customers_email_idx" ON "customers" USING btree ("email");--> statement-breakpoint
-CREATE UNIQUE INDEX "customers_auth_user_id_idx" ON "customers" USING btree ("auth_user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "customers_email_idx" ON "customers" USING btree ("email") WHERE deleted_at is null;--> statement-breakpoint
+CREATE UNIQUE INDEX "customers_auth_user_id_idx" ON "customers" USING btree ("auth_user_id") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "cart_items_cart_id_idx" ON "cart_items" USING btree ("cart_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "cart_items_cart_variant_idx" ON "cart_items" USING btree ("cart_id","variant_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "carts_session_token_idx" ON "carts" USING btree ("session_token");--> statement-breakpoint
@@ -622,8 +667,11 @@ CREATE UNIQUE INDEX "payments_stripe_payment_intent_id_idx" ON "payments" USING 
 CREATE INDEX "payments_order_id_idx" ON "payments" USING btree ("order_id");--> statement-breakpoint
 CREATE INDEX "refunds_payment_id_idx" ON "refunds" USING btree ("payment_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "refunds_stripe_refund_id_idx" ON "refunds" USING btree ("stripe_refund_id");--> statement-breakpoint
+CREATE INDEX "discount_categories_category_id_idx" ON "discount_categories" USING btree ("category_id");--> statement-breakpoint
+CREATE INDEX "discount_products_product_id_idx" ON "discount_products" USING btree ("product_id");--> statement-breakpoint
 CREATE INDEX "discount_redemptions_discount_id_idx" ON "discount_redemptions" USING btree ("discount_id");--> statement-breakpoint
 CREATE INDEX "discount_redemptions_customer_id_idx" ON "discount_redemptions" USING btree ("customer_id");--> statement-breakpoint
+CREATE INDEX "discount_redemptions_order_id_idx" ON "discount_redemptions" USING btree ("order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "discount_redemptions_order_idx" ON "discount_redemptions" USING btree ("discount_id","order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "discounts_code_idx" ON "discounts" USING btree ("code");--> statement-breakpoint
 CREATE INDEX "discounts_active_idx" ON "discounts" USING btree ("is_active");--> statement-breakpoint
@@ -638,18 +686,24 @@ CREATE UNIQUE INDEX "roles_name_idx" ON "roles" USING btree ("name");--> stateme
 CREATE UNIQUE INDEX "webhook_events_source_event_id_idx" ON "webhook_events" USING btree ("source","event_id");--> statement-breakpoint
 CREATE INDEX "webhook_events_type_idx" ON "webhook_events" USING btree ("type");--> statement-breakpoint
 CREATE UNIQUE INDEX "abandoned_carts_cart_id_idx" ON "abandoned_carts" USING btree ("cart_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "blog_posts_slug_idx" ON "blog_posts" USING btree ("slug");--> statement-breakpoint
+CREATE INDEX "abandoned_carts_recovery_order_id_idx" ON "abandoned_carts" USING btree ("recovery_order_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "blog_posts_slug_idx" ON "blog_posts" USING btree ("slug") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "blog_posts_status_idx" ON "blog_posts" USING btree ("status");--> statement-breakpoint
-CREATE UNIQUE INDEX "cms_pages_slug_idx" ON "cms_pages" USING btree ("slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "cms_pages_slug_idx" ON "cms_pages" USING btree ("slug") WHERE deleted_at is null;--> statement-breakpoint
 CREATE INDEX "cms_pages_status_idx" ON "cms_pages" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "gift_card_transactions_gift_card_id_idx" ON "gift_card_transactions" USING btree ("gift_card_id");--> statement-breakpoint
+CREATE INDEX "gift_card_transactions_order_id_idx" ON "gift_card_transactions" USING btree ("order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "gift_cards_code_idx" ON "gift_cards" USING btree ("code");--> statement-breakpoint
+CREATE INDEX "gift_cards_customer_id_idx" ON "gift_cards" USING btree ("customer_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "loyalty_accounts_customer_id_idx" ON "loyalty_accounts" USING btree ("customer_id");--> statement-breakpoint
 CREATE INDEX "loyalty_ledger_account_id_idx" ON "loyalty_ledger" USING btree ("account_id");--> statement-breakpoint
+CREATE INDEX "loyalty_ledger_order_id_idx" ON "loyalty_ledger" USING btree ("order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "newsletter_subscribers_email_idx" ON "newsletter_subscribers" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "reviews_product_id_idx" ON "reviews" USING btree ("product_id");--> statement-breakpoint
 CREATE INDEX "reviews_status_idx" ON "reviews" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "reviews_order_id_idx" ON "reviews" USING btree ("order_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "reviews_customer_product_idx" ON "reviews" USING btree ("customer_id","product_id");--> statement-breakpoint
 CREATE INDEX "wishlist_items_wishlist_id_idx" ON "wishlist_items" USING btree ("wishlist_id");--> statement-breakpoint
+CREATE INDEX "wishlist_items_variant_id_idx" ON "wishlist_items" USING btree ("variant_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "wishlist_items_unique_idx" ON "wishlist_items" USING btree ("wishlist_id","product_id");--> statement-breakpoint
 CREATE INDEX "wishlists_customer_id_idx" ON "wishlists" USING btree ("customer_id");

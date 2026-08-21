@@ -28,7 +28,9 @@ export const updateSettingsSchema = z
       .strict()
       .nullable()
       .optional(),
-    logoUrl: z.url().nullable().optional(),
+    // http(s) only — the value flows to public storefronts, so never allow
+    // javascript:/data: schemes (§9 XSS defense-in-depth).
+    logoUrl: z.url({ protocol: /^https?$/ }).nullable().optional(),
     currency: currencySchema.optional(),
     featureFlags: featureFlagsPatchSchema.optional(),
     emailConfig: z

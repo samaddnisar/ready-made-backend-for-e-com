@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { getSettings, normalizeFlags } from "@repo/core";
-import { requireAdminPage } from "@/lib/auth";
-import { can } from "@/lib/auth";
+import { can, requireReadPage } from "@/lib/auth";
 import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const admin = await requireAdminPage();
+  const admin = await requireReadPage("settings");
   const settings = await getSettings();
 
   return (

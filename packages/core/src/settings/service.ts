@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { settings } from "../db/schema/platform";
 import {
@@ -46,26 +46,28 @@ export async function getSettings(): Promise<Settings> {
 /** Patch the singleton; feature flags merge rather than replace. */
 export async function updateSettings(patch: SettingsUpdate): Promise<Settings> {
   const db = getDb();
-  const current = await getSettings();
+  await getSettings(); // ensure the row exists
 
-  const next = {
-    ...patch,
-    featureFlags: patch.featureFlags
-      ? { ...normalizeFlags(current.featureFlags), ...patch.featureFlags }
-      : undefined,
-    updatedAt: new Date(),
-  };
+  const { featureFlags: flagsPatch, ...rest } = patch;
   // Drop undefined keys so we don't null-out columns unintentionally.
-  const set = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined));
+  const set: Record<string, unknown> = Object.fromEntries(
+    Object.entries(rest).filter(([, v]) => v !== undefined),
+  );
+  set.updatedAt = new Date();
+  if (flagsPatch && Object.keys(flagsPatch).length > 0) {
+    // Atomic jsonb merge: the DB row — never a possibly-stale cached copy —
+    // is the merge base, so concurrent single-flag toggles from different
+    // serverless instances can't silently revert each other.
+    set.featureFlags = sql`${settings.featureFlags} || ${JSON.stringify(flagsPatch)}::jsonb`;
+  }
 
   const [row] = await db
     .update(settings)
-    .set(set)
+    .set(set as Partial<typeof settings.$inferInsert>)
     .where(eq(settings.id, SETTINGS_ID))
     .returning();
   if (!row) throw new Error("Settings row missing — run db:seed");
 
-  invalidateSettingsCache();
   const value = { ...row, featureFlags: normalizeFlags(row.featureFlags) };
   cache = { value, loadedAt: Date.now() };
   return value;

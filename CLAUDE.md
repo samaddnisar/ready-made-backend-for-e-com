@@ -46,6 +46,13 @@ Source of truth: `ecommerce-boilerplate-spec.md`. Build in the phases listed the
 - **Snapshots**: order items copy title/sku/price at purchase; addresses are jsonb
   snapshots on the order. Never join live catalog data for historical orders.
 - **Soft delete** (`deleted_at`) on catalog + customer data — filter it in queries.
+  Unique indexes on soft-deletable tables must be **partial**
+  (`.where(sql\`deleted_at is null\`)`) so deleted rows release their slug/sku/email.
+- **Every new table MUST end with `.enableRLS()`** — the Supabase Data API exposes
+  the public schema to anyone with the anon key; RLS default-deny is the shield.
+  (The app itself is unaffected: DATABASE_URL connects as table owner.)
+- **FK columns get indexes** (§9) — including reverse-lookup columns and the
+  second column of composite PKs when queried alone.
 
 ## Workflow
 

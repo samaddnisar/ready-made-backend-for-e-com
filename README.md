@@ -50,6 +50,11 @@ then re-run `pnpm db:seed` with `SEED_ADMIN_EMAIL=<email> SEED_ADMIN_AUTH_USER_I
 
 1. `git clone` this repo (clone — don't copy — so core fixes can be pulled later).
 2. New Supabase project; set env vars; `pnpm db:migrate && pnpm db:seed`.
+   Every table ships with **RLS enabled and no policies** (default-deny): the app reads
+   the DB via `DATABASE_URL` as table owner, and Supabase's auto-generated Data API
+   (`/rest/v1/`, reachable with the public anon key) gets nothing. Keep it that way —
+   never add permissive policies, and prefer also removing `public` from the Data API's
+   exposed schemas (Supabase dashboard → Settings → API) since this app doesn't use it.
 3. Set store info + currency; toggle features for this client in admin Settings.
 4. Decide architectural features up front (multi-currency, subscriptions, marketplace,
    i18n, B2B) — these are code changes, not toggles.

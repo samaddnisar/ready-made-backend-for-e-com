@@ -1,5 +1,5 @@
 {
-  "id": "d72d9b09-8654-4195-a795-8dc247b565e7",
+  "id": "cca57516-6d8c-4b6e-aca5-dd7cf093d081",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -97,6 +97,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -136,7 +137,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.collections": {
       "name": "collections",
@@ -231,6 +232,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -241,7 +243,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_categories": {
       "name": "product_categories",
@@ -317,7 +319,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_collections": {
       "name": "product_collections",
@@ -400,7 +402,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_images": {
       "name": "product_images",
@@ -474,6 +476,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "product_images_variant_id_idx": {
+          "name": "product_images_variant_id_idx",
+          "columns": [
+            {
+              "expression": "variant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -508,7 +525,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_relations": {
       "name": "product_relations",
@@ -575,7 +592,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.product_variants": {
       "name": "product_variants",
@@ -692,6 +709,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -716,7 +734,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.products": {
       "name": "products",
@@ -818,6 +836,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -858,7 +877,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.inventory": {
       "name": "inventory",
@@ -962,7 +981,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.inventory_adjustments": {
       "name": "inventory_adjustments",
@@ -1050,7 +1069,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.inventory_reservations": {
       "name": "inventory_reservations",
@@ -1212,7 +1231,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.addresses": {
       "name": "addresses",
@@ -1363,7 +1382,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.customers": {
       "name": "customers",
@@ -1452,6 +1471,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1467,6 +1487,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1477,7 +1498,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.cart_items": {
       "name": "cart_items",
@@ -1599,7 +1620,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.carts": {
       "name": "carts",
@@ -1746,7 +1767,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.order_items": {
       "name": "order_items",
@@ -1871,7 +1892,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.order_status_history": {
       "name": "order_status_history",
@@ -1967,7 +1988,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.orders": {
       "name": "orders",
@@ -2192,7 +2213,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.payments": {
       "name": "payments",
@@ -2309,7 +2330,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.refunds": {
       "name": "refunds",
@@ -2426,7 +2447,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.discount_categories": {
       "name": "discount_categories",
@@ -2445,7 +2466,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "discount_categories_category_id_idx": {
+          "name": "discount_categories_category_id_idx",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "discount_categories_discount_id_discounts_id_fk": {
           "name": "discount_categories_discount_id_discounts_id_fk",
@@ -2486,7 +2523,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.discount_products": {
       "name": "discount_products",
@@ -2505,7 +2542,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "discount_products_product_id_idx": {
+          "name": "discount_products_product_id_idx",
+          "columns": [
+            {
+              "expression": "product_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "discount_products_discount_id_discounts_id_fk": {
           "name": "discount_products_discount_id_discounts_id_fk",
@@ -2546,7 +2599,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.discount_redemptions": {
       "name": "discount_redemptions",
@@ -2613,6 +2666,21 @@
           "columns": [
             {
               "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "discount_redemptions_order_id_idx": {
+          "name": "discount_redemptions_order_id_idx",
+          "columns": [
+            {
+              "expression": "order_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2690,7 +2758,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.discounts": {
       "name": "discounts",
@@ -2827,7 +2895,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.shipping_rates": {
       "name": "shipping_rates",
@@ -2944,7 +3012,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.shipping_zones": {
       "name": "shipping_zones",
@@ -2991,7 +3059,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.tax_settings": {
       "name": "tax_settings",
@@ -3047,7 +3115,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.admin_users": {
       "name": "admin_users",
@@ -3156,7 +3224,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.audit_log": {
       "name": "audit_log",
@@ -3278,7 +3346,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.media": {
       "name": "media",
@@ -3382,7 +3450,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.roles": {
       "name": "roles",
@@ -3452,7 +3520,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.settings": {
       "name": "settings",
@@ -3537,7 +3605,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.webhook_events": {
       "name": "webhook_events",
@@ -3653,7 +3721,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.abandoned_carts": {
       "name": "abandoned_carts",
@@ -3726,6 +3794,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "abandoned_carts_recovery_order_id_idx": {
+          "name": "abandoned_carts_recovery_order_id_idx",
+          "columns": [
+            {
+              "expression": "recovery_order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3760,7 +3843,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.blog_posts": {
       "name": "blog_posts",
@@ -3881,6 +3964,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3906,7 +3990,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.cms_pages": {
       "name": "cms_pages",
@@ -3996,6 +4080,7 @@
             }
           ],
           "isUnique": true,
+          "where": "deleted_at is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4021,7 +4106,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.gift_card_transactions": {
       "name": "gift_card_transactions",
@@ -4088,6 +4173,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "gift_card_transactions_order_id_idx": {
+          "name": "gift_card_transactions_order_id_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -4122,7 +4222,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.gift_cards": {
       "name": "gift_cards",
@@ -4209,6 +4309,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "gift_cards_customer_id_idx": {
+          "name": "gift_cards_customer_id_idx",
+          "columns": [
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -4230,7 +4345,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.loyalty_accounts": {
       "name": "loyalty_accounts",
@@ -4307,7 +4422,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.loyalty_ledger": {
       "name": "loyalty_ledger",
@@ -4374,6 +4489,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "loyalty_ledger_order_id_idx": {
+          "name": "loyalty_ledger_order_id_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -4408,7 +4538,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.newsletter_subscribers": {
       "name": "newsletter_subscribers",
@@ -4490,7 +4620,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.reviews": {
       "name": "reviews",
@@ -4593,6 +4723,21 @@
           "method": "btree",
           "with": {}
         },
+        "reviews_order_id_idx": {
+          "name": "reviews_order_id_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "reviews_customer_product_idx": {
           "name": "reviews_customer_product_idx",
           "columns": [
@@ -4660,7 +4805,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.wishlist_items": {
       "name": "wishlist_items",
@@ -4712,6 +4857,21 @@
           "columns": [
             {
               "expression": "wishlist_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "wishlist_items_variant_id_idx": {
+          "name": "wishlist_items_variant_id_idx",
+          "columns": [
+            {
+              "expression": "variant_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4789,7 +4949,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.wishlists": {
       "name": "wishlists",
@@ -4866,7 +5026,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     }
   },
   "enums": {

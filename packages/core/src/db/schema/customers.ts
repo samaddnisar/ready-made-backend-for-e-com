@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -24,10 +25,11 @@ export const customers = pgTable(
     ...softDelete(),
   },
   (t) => [
-    uniqueIndex("customers_email_idx").on(t.email),
-    uniqueIndex("customers_auth_user_id_idx").on(t.authUserId),
+    // Partial: a soft-deleted customer releases their email / auth link.
+    uniqueIndex("customers_email_idx").on(t.email).where(sql`deleted_at is null`),
+    uniqueIndex("customers_auth_user_id_idx").on(t.authUserId).where(sql`deleted_at is null`),
   ],
-);
+).enableRLS();
 
 export const addresses = pgTable(
   "addresses",
@@ -53,4 +55,4 @@ export const addresses = pgTable(
     ...softDelete(),
   },
   (t) => [index("addresses_customer_id_idx").on(t.customerId)],
-);
+).enableRLS();

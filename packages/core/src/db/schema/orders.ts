@@ -60,7 +60,7 @@ export const orders = pgTable(
     index("orders_email_idx").on(t.email),
     index("orders_created_at_idx").on(t.createdAt),
   ],
-);
+).enableRLS();
 
 export const orderItems = pgTable(
   "order_items",
@@ -80,7 +80,7 @@ export const orderItems = pgTable(
     ...timestamps(),
   },
   (t) => [index("order_items_order_id_idx").on(t.orderId)],
-);
+).enableRLS();
 
 export const orderStatusHistory = pgTable(
   "order_status_history",
@@ -97,4 +97,4 @@ export const orderStatusHistory = pgTable(
     ...timestamps(),
   },
   (t) => [index("order_status_history_order_id_idx").on(t.orderId)],
-);
+).enableRLS();

@@ -7,7 +7,7 @@ export const shippingZones = pgTable("shipping_zones", {
   /** ISO country codes; "*" entry = rest of world. */
   countries: jsonb("countries").$type<string[]>().notNull().default([]),
   ...timestamps(),
-});
+}).enableRLS();
 
 export const shippingRates = pgTable(
   "shipping_rates",
@@ -28,7 +28,7 @@ export const shippingRates = pgTable(
     ...timestamps(),
   },
   (t) => [index("shipping_rates_zone_id_idx").on(t.zoneId)],
-);
+).enableRLS();
 
 /** Singleton — one row, enforced by the fixed primary key. */
 export const taxSettings = pgTable("tax_settings", {
@@ -38,4 +38,4 @@ export const taxSettings = pgTable("tax_settings", {
   rateBps: integer("rate_bps").notNull().default(0),
   pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
   ...timestamps(),
-});
+}).enableRLS();
