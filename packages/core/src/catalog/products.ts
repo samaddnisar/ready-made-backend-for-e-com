@@ -2,7 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "d
 import { getDb, type Db } from "../db/client";
 import {
   categories,
-  collections,
+  collections as collectionsTable,
   inventory,
   productCategories,
   productCollections,
@@ -11,7 +11,8 @@ import {
   products,
   productVariants,
 } from "../db/schema";
-import { notFound } from "../errors";
+import { badRequest, notFound } from "../errors";
+import { getAvailability } from "../inventory/service";
 import { paginate, type Paginated } from "../validation/common";
 import type {
   CreateProductInput,
@@ -60,6 +61,8 @@ export type PublicProduct = {
     price: number;
     compareAtPrice: number | null;
     optionValues: Record<string, string>;
+    /** Purchasable right now (untracked, backorderable, or stock available). */
+    inStock: boolean;
   }[];
   categories: { name: string; slug: string }[];
   metaTitle: string | null;
@@ -207,6 +210,7 @@ export async function createProduct(input: CreateProductInput): Promise<ProductD
       .returning({ id: products.id });
     if (!product) throw new Error("Insert failed");
 
+    await assertReferencedIdsExist(tx, input);
     await insertVariants(tx, product.id, input.variants);
     await replaceImages(tx, product.id, input.images);
     await replaceLinks(tx, product.id, input.categoryIds, input.collectionIds);
@@ -218,6 +222,30 @@ export async function createProduct(input: CreateProductInput): Promise<ProductD
 }
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** §9: referenced ids must fail as 4xx with the offending ids, never FK 500s. */
+async function assertReferencedIdsExist(
+  tx: Tx,
+  input: Pick<UpdateProductInput, "categoryIds" | "collectionIds" | "relatedProductIds">,
+): Promise<void> {
+  const check = async (
+    ids: string[] | undefined,
+    table: typeof categories | typeof collectionsTable | typeof products,
+    label: string,
+  ) => {
+    if (!ids || ids.length === 0) return;
+    const rows = await tx
+      .select({ id: table.id })
+      .from(table)
+      .where(and(inArray(table.id, ids), isNull(table.deletedAt)));
+    const known = new Set(rows.map((r) => r.id));
+    const missing = ids.filter((id) => !known.has(id));
+    if (missing.length > 0) throw badRequest(`Unknown ${label}: ${missing.join(", ")}`);
+  };
+  await check(input.categoryIds, categories, "categories");
+  await check(input.collectionIds, collectionsTable, "collections");
+  await check(input.relatedProductIds, products, "related products");
+}
 
 async function insertVariants(
   tx: Tx,
@@ -250,6 +278,21 @@ async function replaceImages(
 ): Promise<void> {
   await tx.delete(productImages).where(eq(productImages.productId, productId));
   if (images.length > 0) {
+    // An image may only reference this product's own variants (§9).
+    const referenced = [
+      ...new Set(images.map((i) => i.variantId).filter((v): v is string => Boolean(v))),
+    ];
+    if (referenced.length > 0) {
+      const rows = await tx
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .where(and(eq(productVariants.productId, productId), isNull(productVariants.deletedAt)));
+      const own = new Set(rows.map((r) => r.id));
+      const foreign = referenced.filter((v) => !own.has(v));
+      if (foreign.length > 0) {
+        throw badRequest(`Image variant ids not on this product: ${foreign.join(", ")}`);
+      }
+    }
     await tx.insert(productImages).values(
       images.map((img, i) => ({
         productId,
@@ -278,11 +321,38 @@ async function replaceLinks(
     }
   }
   if (collectionIds) {
+    // Preserve the collection's curated ordering: links that already exist
+    // keep their position; new links are appended at the end.
+    const existing = await tx
+      .select({ collectionId: productCollections.collectionId, position: productCollections.position })
+      .from(productCollections)
+      .where(eq(productCollections.productId, productId));
+    const keptPosition = new Map(existing.map((l) => [l.collectionId, l.position]));
+
     await tx.delete(productCollections).where(eq(productCollections.productId, productId));
     if (collectionIds.length > 0) {
+      const newIds = collectionIds.filter((id) => !keptPosition.has(id));
+      const maxPosition = new Map<string, number>();
+      if (newIds.length > 0) {
+        const rows = await tx
+          .select({
+            collectionId: productCollections.collectionId,
+            max: sql<number>`max(${productCollections.position})::int`,
+          })
+          .from(productCollections)
+          .where(inArray(productCollections.collectionId, newIds))
+          .groupBy(productCollections.collectionId);
+        for (const r of rows) maxPosition.set(r.collectionId, r.max);
+      }
       await tx
         .insert(productCollections)
-        .values(collectionIds.map((collectionId, i) => ({ productId, collectionId, position: i })))
+        .values(
+          collectionIds.map((collectionId) => ({
+            productId,
+            collectionId,
+            position: keptPosition.get(collectionId) ?? (maxPosition.get(collectionId) ?? -1) + 1,
+          })),
+        )
         .onConflictDoNothing();
     }
   }
@@ -312,6 +382,7 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
       : undefined;
 
   await db.transaction(async (tx) => {
+    await assertReferencedIdsExist(tx, input);
     await tx
       .update(products)
       .set({
@@ -434,6 +505,7 @@ export async function listPublicProducts(
 ): Promise<Paginated<Omit<PublicProduct, "variants" | "categories">>> {
   const db = getDb();
   const filters: SQL[] = [publicVisible!];
+  let manualCollectionOrder: SQL | undefined;
 
   if (query.q) filters.push(ilike(products.title, `%${query.q}%`));
   if (query.category) {
@@ -443,7 +515,7 @@ export async function listPublicProducts(
   }
   if (query.collection) {
     const collection = await db.query.collections.findFirst({
-      where: and(eq(collections.slug, query.collection), isNull(collections.deletedAt)),
+      where: and(eq(collectionsTable.slug, query.collection), isNull(collectionsTable.deletedAt)),
     });
     if (!collection) return paginate([], query.page, query.pageSize, 0);
 
@@ -451,6 +523,10 @@ export async function listPublicProducts(
       filters.push(
         sql`exists (select 1 from product_collections pcl where pcl.product_id = ${products.id} and pcl.collection_id = ${collection.id})`,
       );
+      // Default sort for a manual collection is its curated order.
+      if (query.sort === "newest") {
+        manualCollectionOrder = sql`(select pcl.position from product_collections pcl where pcl.product_id = ${products.id} and pcl.collection_id = ${collection.id}) asc`;
+      }
     } else {
       // Rule-based: membership is computed, not materialized in the join table.
       for (const rule of collection.rules) filters.push(collectionRuleToSql(rule));
@@ -459,13 +535,14 @@ export async function listPublicProducts(
 
   const where = and(...filters);
   const orderBy =
-    query.sort === "price_asc"
+    manualCollectionOrder ??
+    (query.sort === "price_asc"
       ? sql`${minPriceSql} asc nulls last`
       : query.sort === "price_desc"
         ? sql`${minPriceSql} desc nulls last`
         : query.sort === "title"
           ? asc(products.title)
-          : desc(products.createdAt);
+          : desc(products.createdAt));
 
   const [countRow] = await db.select({ total: sql<number>`count(*)::int` }).from(products).where(where);
   const rows = await db
@@ -519,6 +596,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
   });
   if (!product) throw notFound("Product not found");
 
+  const availability = await getAvailability(product.variants.map((v) => v.id));
   const prices = product.variants.map((v) => v.price);
   return {
     id: product.id,
@@ -536,6 +614,7 @@ export async function getPublicProductBySlug(slug: string): Promise<PublicProduc
       price: v.price,
       compareAtPrice: v.compareAtPrice,
       optionValues: v.optionValues,
+      inStock: availability.get(v.id)?.inStock ?? true,
     })),
     categories: product.productCategories
       .filter((pc) => pc.category.deletedAt === null)

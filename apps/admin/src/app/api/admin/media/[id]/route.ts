@@ -1,4 +1,4 @@
-import { badRequest, deleteMediaRecord, updateMediaAlt, updateMediaSchema } from "@repo/core";
+import { badRequest, deleteMediaRecord, notFound, updateMediaAlt, updateMediaSchema, uuidSchema } from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { createSupabaseAdminClient, MEDIA_BUCKET } from "@/lib/supabase/admin";
@@ -9,7 +9,7 @@ export const PATCH = withAdminApi(
   { resource: "media", action: "update" },
   async (req, { params, admin }) => {
     const { id } = await params;
-    if (!id) throw badRequest("Missing id parameter");
+    if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     const input = await parseBody(req, updateMediaSchema);
     const item = await updateMediaAlt(id, input.alt);
 
@@ -30,7 +30,7 @@ export const DELETE = withAdminApi(
   { resource: "media", action: "delete" },
   async (req, { params, admin }) => {
     const { id } = await params;
-    if (!id) throw badRequest("Missing id parameter");
+    if (!id || !uuidSchema.safeParse(id).success) throw notFound();
 
     // DB record first (throws notFound if missing) …
     const record = await deleteMediaRecord(id);

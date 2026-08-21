@@ -39,6 +39,8 @@ export type ProductFormInitial = {
   slug: string;
   description: string | null;
   status: "draft" | "active" | "archived";
+  basePrice: number | null;
+  baseCompareAtPrice: number | null;
   metaTitle: string | null;
   metaDescription: string | null;
   ogImageUrl: string | null;
@@ -52,14 +54,14 @@ export type ProductFormInitial = {
     weightGrams: number | null;
     barcode: string | null;
   }[];
-  images: { url: string; alt: string | null }[];
+  images: { url: string; alt: string | null; variantId: string | null }[];
   categoryIds: string[];
   collectionIds: string[];
 };
 
 type CategoryOption = { id: string; name: string; parentId: string | null };
 type CollectionOption = { id: string; name: string };
-type ImageRow = { url: string; alt: string };
+type ImageRow = { url: string; alt: string; variantId: string | null };
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -160,6 +162,10 @@ export function ProductForm({
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [status, setStatus] = useState<ProductFormInitial["status"]>(initial?.status ?? "draft");
+  const [basePrice, setBasePrice] = useState(centsToDollars(initial?.basePrice ?? null));
+  const [baseCompareAtPrice, setBaseCompareAtPrice] = useState(
+    centsToDollars(initial?.baseCompareAtPrice ?? null),
+  );
   const [metaTitle, setMetaTitle] = useState(initial?.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(initial?.metaDescription ?? "");
   const [ogImageUrl, setOgImageUrl] = useState(initial?.ogImageUrl ?? "");
@@ -167,7 +173,12 @@ export function ProductForm({
   const [optionNames, setOptionNames] = useState<string[]>(() => initialOptionNames(initial));
   const [variants, setVariants] = useState<VariantRow[]>(() => initialVariantRows(initial));
   const [images, setImages] = useState<ImageRow[]>(
-    () => initial?.images.map((img) => ({ url: img.url, alt: img.alt ?? "" })) ?? [],
+    () =>
+      initial?.images.map((img) => ({
+        url: img.url,
+        alt: img.alt ?? "",
+        variantId: img.variantId,
+      })) ?? [],
   );
 
   const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
@@ -243,6 +254,17 @@ export function ProductForm({
       return;
     }
 
+    const basePriceCents = dollarsToCents(basePrice);
+    if (basePrice.trim() !== "" && basePriceCents === null) {
+      toast.error("Base price is invalid");
+      return;
+    }
+    const baseCompareAtPriceCents = dollarsToCents(baseCompareAtPrice);
+    if (baseCompareAtPrice.trim() !== "" && baseCompareAtPriceCents === null) {
+      toast.error("Base compare-at price is invalid");
+      return;
+    }
+
     const variantPayloads = [];
     for (let i = 0; i < variants.length; i++) {
       const row = variants[i]!;
@@ -296,11 +318,14 @@ export function ProductForm({
       ...(slug.trim() ? { slug: slug.trim() } : {}),
       description: description.trim() ? description : null,
       status,
+      basePrice: basePriceCents,
+      baseCompareAtPrice: baseCompareAtPriceCents,
       variants: variantPayloads,
       images: images.map((img, i) => ({
         url: img.url,
         alt: img.alt.trim() ? img.alt.trim() : null,
         position: i,
+        variantId: img.variantId,
       })),
       categoryIds,
       collectionIds,
@@ -584,6 +609,41 @@ export function ProductForm({
 
           <Card>
             <CardHeader>
+              <CardTitle>Pricing</CardTitle>
+              <CardDescription>
+                Optional product-level price, used when variants don&apos;t set their own.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="product-base-price">Base price ({currency})</Label>
+                <Input
+                  id="product-base-price"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(e.target.value)}
+                  disabled={!canWrite}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="product-base-compare">Compare-at price ({currency})</Label>
+                <Input
+                  id="product-base-compare"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={baseCompareAtPrice}
+                  onChange={(e) => setBaseCompareAtPrice(e.target.value)}
+                  disabled={!canWrite}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Categories</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -658,7 +718,7 @@ export function ProductForm({
         onSelect={(selection) =>
           setImages((prev) => [
             ...prev,
-            ...selection.map((item) => ({ url: item.url, alt: item.alt ?? "" })),
+            ...selection.map((item) => ({ url: item.url, alt: item.alt ?? "", variantId: null })),
           ])
         }
       />

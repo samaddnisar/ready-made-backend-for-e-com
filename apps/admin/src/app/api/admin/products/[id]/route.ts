@@ -1,10 +1,4 @@
-import {
-  badRequest,
-  getProductById,
-  softDeleteProduct,
-  updateProduct,
-  updateProductSchema,
-} from "@repo/core";
+import { badRequest, getProductById, notFound, softDeleteProduct, updateProduct, updateProductSchema, uuidSchema } from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
@@ -12,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const GET = withAdminApi({ resource: "products", action: "read" }, async (_req, { params }) => {
   const { id } = await params;
-  if (!id) throw badRequest("Missing id parameter");
+  if (!id || !uuidSchema.safeParse(id).success) throw notFound();
   return ok(await getProductById(id));
 });
 
@@ -20,7 +14,7 @@ export const PATCH = withAdminApi(
   { resource: "products", action: "update" },
   async (req, { params, admin }) => {
     const { id } = await params;
-    if (!id) throw badRequest("Missing id parameter");
+    if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     const input = await parseBody(req, updateProductSchema);
     const product = await updateProduct(id, input);
 
@@ -41,7 +35,7 @@ export const DELETE = withAdminApi(
   { resource: "products", action: "delete" },
   async (req, { params, admin }) => {
     const { id } = await params;
-    if (!id) throw badRequest("Missing id parameter");
+    if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     await softDeleteProduct(id);
 
     await writeAudit({ admin, req, action: "delete", resource: "product", resourceId: id });

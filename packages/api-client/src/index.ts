@@ -72,6 +72,8 @@ export type PublicProduct = PublicProductListItem & {
     price: number;
     compareAtPrice: number | null;
     optionValues: Record<string, string>;
+    /** Purchasable right now (untracked, backorderable, or stock available). */
+    inStock: boolean;
   }[];
   categories: { name: string; slug: string }[];
 };

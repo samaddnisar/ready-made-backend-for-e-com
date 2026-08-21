@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ImageIcon, Package, Plus, Search } from "lucide-react";
+import { ImageIcon, Package, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import type { Paginated } from "@repo/core/validation";
 import type { ProductListItem } from "@repo/core";
@@ -56,6 +56,8 @@ const STATUS_BADGE_VARIANT: Record<ProductRow["status"], "default" | "secondary"
 };
 
 const PAGE_SIZE = 20;
+/** Max ids per bulk request (matches bulkProductActionSchema). */
+const BULK_CHUNK_SIZE = 100;
 
 export function ProductsTable({ currency, canWrite }: { currency: string; canWrite: boolean }) {
   const [q, setQ] = useState("");
@@ -65,6 +67,7 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Paginated<ProductRow> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -97,10 +100,15 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
     })
       .then((result) => {
         setData(result);
+        setLoadFailed(false);
         setLoading(false);
+        // Deleting the last row of the last page can leave us on a page that
+        // no longer exists — clamp back to the last real page.
+        if (result.totalPages < page) setPage(Math.max(1, result.totalPages));
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
+        setLoadFailed(true);
         setLoading(false);
         toast.error("Failed to load products", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -108,6 +116,11 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
       });
     return () => controller.abort();
   }, [debouncedQ, status, sort, page, refreshKey]);
+
+  // Selection is scoped to the visible result set — clear it when that changes.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [debouncedQ, status, sort, page]);
 
   const items = useMemo(() => data?.items ?? [], [data]);
   const allSelected = items.length > 0 && items.every((item) => selected.has(item.id));
@@ -139,10 +152,16 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
     if (selected.size === 0) return;
     setBulkBusy(true);
     try {
-      const { affected } = await apiFetch<{ affected: number }>("/api/admin/products/bulk", {
-        method: "POST",
-        body: { ids: Array.from(selected), action },
-      });
+      // bulkProductActionSchema caps ids at 100 per request — chunk and sum.
+      const ids = Array.from(selected);
+      let affected = 0;
+      for (let i = 0; i < ids.length; i += BULK_CHUNK_SIZE) {
+        const result = await apiFetch<{ affected: number }>("/api/admin/products/bulk", {
+          method: "POST",
+          body: { ids: ids.slice(i, i + BULK_CHUNK_SIZE), action },
+        });
+        affected += result.affected;
+      }
       const verb =
         action === "publish"
           ? "published"
@@ -165,7 +184,8 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
 
   const hasFilters = debouncedQ !== "" || status !== "all";
   const showSkeleton = loading && !data;
-  const showEmpty = !showSkeleton && items.length === 0;
+  const showError = loadFailed && !loading;
+  const showEmpty = !showError && !showSkeleton && items.length === 0;
 
   return (
     <div className="space-y-4">
@@ -247,7 +267,18 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
         </div>
       ) : null}
 
-      {showEmpty ? (
+      {showError ? (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Couldn't load products"
+          description="Something went wrong while loading the product list. Check your connection and try again."
+          action={
+            <Button variant="outline" onClick={() => setRefreshKey((k) => k + 1)}>
+              Retry
+            </Button>
+          }
+        />
+      ) : showEmpty ? (
         <EmptyState
           icon={Package}
           title={hasFilters ? "No products match" : "No products yet"}
@@ -378,7 +409,7 @@ export function ProductsTable({ currency, canWrite }: { currency: string; canWri
         </Card>
       )}
 
-      {data && data.total > 0 ? (
+      {!showError && data && data.total > 0 ? (
         <TablePagination
           page={data.page}
           totalPages={data.totalPages}

@@ -1,7 +1,7 @@
-import { and, asc, eq, ilike, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, type Db } from "../db/client";
 import { categories, collections, productCollections, products } from "../db/schema";
-import { conflict, notFound } from "../errors";
+import { badRequest, conflict, notFound } from "../errors";
 import { slugify, uniqueSlug } from "../utils/slug";
 import type {
   CreateCategoryInput,
@@ -76,6 +76,26 @@ export async function createCategory(input: CreateCategoryInput) {
   return row;
 }
 
+/**
+ * Server-side cycle guard (§9 — never trust the client): walk the proposed
+ * parent's ancestor chain; if `id` appears, the move would create a cycle
+ * that detaches the subtree from the root.
+ */
+async function assertNoCategoryCycle(db: Db, id: string, parentId: string): Promise<void> {
+  let cursor: string | null = parentId;
+  const seen = new Set<string>();
+  while (cursor) {
+    if (cursor === id) throw conflict("A category can't be moved under itself or its descendants");
+    if (seen.has(cursor)) break; // pre-existing cycle — don't spin forever
+    seen.add(cursor);
+    const [row] = await db
+      .select({ parentId: categories.parentId })
+      .from(categories)
+      .where(eq(categories.id, cursor));
+    cursor = row?.parentId ?? null;
+  }
+}
+
 export async function updateCategory(id: string, input: UpdateCategoryInput) {
   const db = getDb();
   const existing = await db.query.categories.findFirst({
@@ -83,6 +103,13 @@ export async function updateCategory(id: string, input: UpdateCategoryInput) {
   });
   if (!existing) throw notFound("Category not found");
   if (input.parentId === id) throw conflict("A category can't be its own parent");
+  if (input.parentId) {
+    const parent = await db.query.categories.findFirst({
+      where: and(eq(categories.id, input.parentId), isNull(categories.deletedAt)),
+    });
+    if (!parent) throw notFound("Parent category not found");
+    await assertNoCategoryCycle(db, id, input.parentId);
+  }
 
   const slug =
     input.slug !== undefined || input.name !== undefined
@@ -125,6 +152,9 @@ export async function softDeleteCategory(id: string): Promise<void> {
 /** Public: categories that exist for storefront nav (with active-product counts). */
 export async function listPublicCategories() {
   const db = getDb();
+  // Public counts must only reflect what the storefront can actually list —
+  // drafts/archived products are excluded from every other public path.
+  const activeProductCountSql = sql<number>`(select count(*)::int from product_categories pc join products p on p.id = pc.product_id and p.deleted_at is null and p.status = 'active' where pc.category_id = ${categories.id})`;
   return db
     .select({
       id: categories.id,
@@ -136,7 +166,7 @@ export async function listPublicCategories() {
       metaTitle: categories.metaTitle,
       metaDescription: categories.metaDescription,
       ogImageUrl: categories.ogImageUrl,
-      productCount: categoryProductCountSql,
+      productCount: activeProductCountSql,
     })
     .from(categories)
     .where(isNull(categories.deletedAt))
@@ -265,6 +295,16 @@ export async function setCollectionProducts(id: string, productIds: string[]): P
     where: and(eq(collections.id, id), isNull(collections.deletedAt)),
   });
   if (!existing) throw notFound("Collection not found");
+
+  if (productIds.length > 0) {
+    const found = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(inArray(products.id, productIds), isNull(products.deletedAt)));
+    const known = new Set(found.map((r) => r.id));
+    const missing = productIds.filter((pid) => !known.has(pid));
+    if (missing.length > 0) throw badRequest(`Unknown products: ${missing.join(", ")}`);
+  }
 
   await db.transaction(async (tx) => {
     await tx.delete(productCollections).where(eq(productCollections.collectionId, id));

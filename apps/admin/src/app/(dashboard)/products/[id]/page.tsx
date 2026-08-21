@@ -15,6 +15,8 @@ function toInitial(product: ProductDetail): ProductFormInitial {
     slug: product.slug,
     description: product.description,
     status: product.status,
+    basePrice: product.basePrice,
+    baseCompareAtPrice: product.baseCompareAtPrice,
     metaTitle: product.metaTitle,
     metaDescription: product.metaDescription,
     ogImageUrl: product.ogImageUrl,
@@ -28,7 +30,11 @@ function toInitial(product: ProductDetail): ProductFormInitial {
       weightGrams: v.weightGrams,
       barcode: v.barcode,
     })),
-    images: product.images.map((img) => ({ url: img.url, alt: img.alt })),
+    images: product.images.map((img) => ({
+      url: img.url,
+      alt: img.alt,
+      variantId: img.variantId,
+    })),
     categoryIds: product.categoryIds,
     collectionIds: product.collectionIds,
   };

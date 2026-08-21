@@ -1,4 +1,4 @@
-import { badRequest, listAdjustments, updateInventoryConfig, updateInventoryConfigSchema } from "@repo/core";
+import { badRequest, listAdjustments, notFound, updateInventoryConfig, updateInventoryConfigSchema, uuidSchema } from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const GET = withAdminApi({ resource: "inventory", action: "read" }, async (req, ctx) => {
   const { variantId } = await ctx.params;
-  if (!variantId) throw badRequest("Missing variantId");
+  if (!variantId || !uuidSchema.safeParse(variantId).success) throw notFound();
   return ok({ adjustments: await listAdjustments(variantId) });
 });
 
@@ -14,7 +14,7 @@ export const PATCH = withAdminApi(
   { resource: "inventory", action: "update" },
   async (req, ctx) => {
     const { variantId } = await ctx.params;
-    if (!variantId) throw badRequest("Missing variantId");
+    if (!variantId || !uuidSchema.safeParse(variantId).success) throw notFound();
     const input = await parseBody(req, updateInventoryConfigSchema);
     await updateInventoryConfig(variantId, input);
 

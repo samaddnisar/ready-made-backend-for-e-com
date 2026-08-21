@@ -74,6 +74,30 @@ export function toFailure(err: unknown): { body: ApiFailure; status: number } {
       status: err.status,
     };
   }
+
+  // Safety net for constraint errors that slip past service-level validation:
+  // surface friendly 4xx instead of a generic 500 (§9 graceful failures).
+  const pgCode = (err as { code?: unknown })?.code;
+  if (pgCode === "23505") {
+    return {
+      body: {
+        error: {
+          code: "conflict",
+          message: "A record with this value already exists (duplicate slug, SKU or code)",
+        },
+      },
+      status: 409,
+    };
+  }
+  if (pgCode === "23503") {
+    return {
+      body: {
+        error: { code: "bad_request", message: "A referenced record does not exist" },
+      },
+      status: 400,
+    };
+  }
+
   // Never leak internals (§9) — log the real error at the call site.
   return {
     body: { error: { code: "internal_error", message: "Something went wrong" } },

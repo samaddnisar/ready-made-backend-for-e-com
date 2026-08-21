@@ -1,4 +1,4 @@
-import { badRequest, setCollectionProducts, setCollectionProductsSchema } from "@repo/core";
+import { badRequest, notFound, setCollectionProducts, setCollectionProductsSchema, uuidSchema } from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
@@ -8,7 +8,7 @@ export const PUT = withAdminApi(
   { resource: "products", action: "update" },
   async (req, { params, admin }) => {
     const { id } = await params;
-    if (!id) throw badRequest("Missing id parameter");
+    if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     const input = await parseBody(req, setCollectionProductsSchema);
     await setCollectionProducts(id, input.productIds);
 

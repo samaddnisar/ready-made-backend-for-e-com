@@ -219,7 +219,11 @@ export function CollectionsClient({ canWrite }: { canWrite: boolean }) {
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {collection.productCount}
+                    {collection.isManual ? (
+                      collection.productCount
+                    ) : (
+                      <span className="text-muted-foreground">Auto</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDate(collection.updatedAt)}
@@ -308,6 +312,8 @@ function CollectionFormDialog({
   // Manual product management (edit mode only).
   const [items, setItems] = useState<ManagedProduct[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
+  const [itemsLoadAttempt, setItemsLoadAttempt] = useState(0);
   const [searchQ, setSearchQ] = useState("");
   const [results, setResults] = useState<ProductRow[]>([]);
   const [searching, setSearching] = useState(false);
@@ -316,6 +322,7 @@ function CollectionFormDialog({
     if (!editing) return;
     let cancelled = false;
     setItemsLoading(true);
+    setItemsLoadFailed(false);
     void (async () => {
       try {
         const [detail, page] = await Promise.all([
@@ -338,6 +345,7 @@ function CollectionFormDialog({
         );
       } catch (err) {
         if (!cancelled) {
+          setItemsLoadFailed(true);
           toast.error("Failed to load collection products", {
             description: err instanceof Error ? err.message : undefined,
           });
@@ -349,7 +357,7 @@ function CollectionFormDialog({
     return () => {
       cancelled = true;
     };
-  }, [editing]);
+  }, [editing, itemsLoadAttempt]);
 
   useEffect(() => {
     const q = searchQ.trim();
@@ -407,7 +415,9 @@ function CollectionFormDialog({
       };
       if (editing) {
         await apiFetch(`/api/admin/collections/${editing.id}`, { method: "PATCH", body });
-        if (isManual) {
+        // Only sync memberships once the product list actually loaded — a PUT
+        // before (or after a failed) load would wipe the collection's products.
+        if (isManual && !itemsLoading && !itemsLoadFailed) {
           await apiFetch<{ updated: boolean }>(`/api/admin/collections/${editing.id}/products`, {
             method: "PUT",
             body: { productIds: items.map((item) => item.id) },
@@ -544,7 +554,7 @@ function CollectionFormDialog({
                       <Input
                         value={rule.value}
                         onChange={(e) => updateRule(index, { value: e.target.value })}
-                        placeholder="Value"
+                        placeholder={rule.field === "category" ? "category slug or id" : "Value"}
                         maxLength={200}
                         className="flex-1"
                       />
@@ -632,6 +642,20 @@ function CollectionFormDialog({
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
                   </div>
+                ) : itemsLoadFailed ? (
+                  <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Product list failed to load — memberships left unchanged.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setItemsLoadAttempt((n) => n + 1)}
+                    >
+                      Retry
+                    </Button>
+                  </div>
                 ) : items.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No products in this collection yet.</p>
                 ) : (
@@ -689,7 +713,7 @@ function CollectionFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !name.trim()}>
+            <Button type="submit" disabled={saving || !name.trim() || (isManual && itemsLoading)}>
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               {editing ? "Save changes" : "Create collection"}
             </Button>
