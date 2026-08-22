@@ -11,12 +11,15 @@ import {
   productVariants,
 } from "../db/schema";
 import { AppError, badRequest, notFound } from "../errors";
+import { parseCartDiscountCodes } from "../cart/service";
 import {
   releaseCartReservations,
   releaseExpiredReservations,
   reserveStock,
 } from "../inventory/service";
 import { transitionOrder } from "../orders/state-machine";
+import { resolveDiscounts } from "../promotions/service";
+import { getTaxSettings, resolveShippingRates } from "../shipping/service";
 import { computeTotals, type Totals } from "./totals";
 import type { CheckoutInput } from "../validation/checkout";
 
@@ -67,6 +70,7 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
       variantTitle: productVariants.title,
       variantDeleted: productVariants.deletedAt,
       sku: productVariants.sku,
+      weightGrams: productVariants.weightGrams,
       productId: products.id,
     })
     .from(cartItems)
@@ -88,7 +92,60 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
     );
   }
 
-  const totals = computeTotals({ items });
+  const lines = items.map((i) => ({
+    productId: i.productId,
+    quantity: i.quantity,
+    unitPrice: i.unitPrice,
+  }));
+
+  // ── Discounts (Phase 5): explicit code + codes stored on the cart ──
+  const codes = [
+    ...new Set([
+      ...parseCartDiscountCodes(cart.discountCode),
+      ...(input.discountCode ? [input.discountCode.toUpperCase()] : []),
+    ]),
+  ];
+  let discountTotal = 0;
+  let freeShipping = false;
+  if (codes.length > 0) {
+    // Throws with a customer-readable message when a code is invalid.
+    const resolution = await resolveDiscounts(codes, lines, cart.customerId);
+    discountTotal = resolution.discountTotal;
+    freeShipping = resolution.freeShipping;
+  }
+
+  // ── Shipping (Phase 5): rate must be one resolved for the destination ──
+  const subtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const weightGrams = items.reduce((sum, i) => sum + (i.weightGrams ?? 0) * i.quantity, 0);
+  const rates = await resolveShippingRates(input.shippingAddress.country, {
+    subtotal,
+    weightGrams,
+  });
+  let shippingTotal = 0;
+  let shippingRateName: string | null = null;
+  if (input.shippingRateId) {
+    const rate = rates.find((r) => r.id === input.shippingRateId);
+    if (!rate) throw badRequest("The selected shipping rate isn't available for this destination");
+    shippingRateName = rate.name;
+    shippingTotal = freeShipping ? 0 : rate.price;
+  } else if (rates.length > 0) {
+    // The store has shipping configured — the storefront must pick a rate
+    // (GET /api/public/shipping-rates lists them). Never silently ship free.
+    throw badRequest("Select a shipping rate", { rates });
+  }
+
+  // ── Tax (Phase 5): none / flat. stripe_tax is an architectural add-on
+  //    (per-client code change, §4) and is treated as none until wired. ──
+  const tax = await getTaxSettings();
+  const totals = computeTotals({
+    items: lines,
+    discountTotal,
+    shippingTotal,
+    tax:
+      tax.mode === "flat"
+        ? { mode: "flat", rateBps: tax.rateBps, pricesIncludeTax: tax.pricesIncludeTax }
+        : { mode: "none" },
+  });
   if (totals.grandTotal < MINIMUM_CHARGE_MINOR_UNITS) {
     throw new AppError("payment_error", "Order total is below the minimum chargeable amount");
   }
@@ -160,6 +217,8 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
         currency: cart.currency,
         shippingAddress: input.shippingAddress,
         billingAddress: input.billingAddress ?? input.shippingAddress,
+        discountCode: codes.length > 0 ? codes.join(",") : null,
+        shippingRateName,
       })
       .returning();
     if (!order) throw new Error("Order insert failed");

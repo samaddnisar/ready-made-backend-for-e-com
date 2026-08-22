@@ -144,6 +144,24 @@ export type CartView = {
   items: CartItemView[];
   itemCount: number;
   subtotal: number;
+  /** Codes currently applied to the cart. */
+  discountCodes: string[];
+  /** Projected goods discount for the applied codes (minor units). */
+  discountTotal: number;
+  /** One of the applied codes grants free shipping. */
+  freeShipping: boolean;
+  /** Set when stored codes stopped being valid (expired, limit reached…). */
+  discountError: string | null;
+};
+
+export type ResolvedShippingRate = {
+  id: string;
+  zoneId: string;
+  zoneName: string;
+  name: string;
+  type: "flat" | "weight" | "price";
+  /** Minor units. */
+  price: number;
 };
 
 export type CheckoutAddress = {
@@ -166,6 +184,13 @@ export type CheckoutRequest = {
   shippingAddress: CheckoutAddress;
   /** Defaults to the shipping address when omitted. */
   billingAddress?: CheckoutAddress;
+  /**
+   * Required whenever the store has shipping rates for the destination —
+   * fetch them with api.shipping.rates(); checkout rejects otherwise.
+   */
+  shippingRateId?: string;
+  /** Extra code applied at checkout (cart-applied codes are included automatically). */
+  discountCode?: string;
 };
 
 export type CheckoutResult = {
@@ -280,6 +305,15 @@ export function createApiClient(opts: ApiClientOptions) {
           `/api/public/collections/${encodeURIComponent(slug)}${toQueryString(query)}`,
         ),
     },
+    shipping: {
+      /** Rates for a destination given the cart's contents — pick one for checkout. */
+      rates: (cartToken: string, country: string) =>
+        request<{ rates: ResolvedShippingRate[] }>(
+          opts,
+          "GET",
+          `/api/public/shipping-rates${toQueryString({ cartToken, country })}`,
+        ),
+    },
     cart: {
       /** Create an anonymous cart; persist the returned token client-side. */
       create: () => request<CartView>(opts, "POST", "/api/public/cart"),
@@ -293,6 +327,21 @@ export function createApiClient(opts: ApiClientOptions) {
           "POST",
           `/api/public/cart/${encodeURIComponent(token)}/items`,
           input,
+        ),
+      /** Apply a discount code; rejects with the server's reason when invalid. */
+      applyDiscount: (token: string, code: string) =>
+        request<CartView>(
+          opts,
+          "POST",
+          `/api/public/cart/${encodeURIComponent(token)}/discount`,
+          { code },
+        ),
+      /** Remove one code, or every code when omitted. */
+      removeDiscount: (token: string, code?: string) =>
+        request<CartView>(
+          opts,
+          "DELETE",
+          `/api/public/cart/${encodeURIComponent(token)}/discount${code ? `?code=${encodeURIComponent(code)}` : ""}`,
         ),
       /** Set line quantities (0 removes a line); returns the updated cart. */
       updateItems: (token: string, input: { items: { variantId: string; quantity: number }[] }) =>

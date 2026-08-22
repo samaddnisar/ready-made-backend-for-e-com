@@ -36,6 +36,14 @@ export type CartView = {
   items: CartItemView[];
   itemCount: number;
   subtotal: number;
+  /** Codes currently applied to the cart. */
+  discountCodes: string[];
+  /** Projected goods discount for the applied codes (minor units). */
+  discountTotal: number;
+  /** One of the applied codes grants free shipping. */
+  freeShipping: boolean;
+  /** Set when stored codes stopped being valid (expired, limit reached…). */
+  discountError: string | null;
 };
 
 function newCartToken(): string {
@@ -236,7 +244,14 @@ async function loadItems(cartId: string) {
   }));
 }
 
-function buildCartView(cart: CartRow, items: LoadedItem[]): CartView {
+export function parseCartDiscountCodes(stored: string | null): string[] {
+  return (stored ?? "")
+    .split(",")
+    .map((c) => c.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+async function buildCartView(cart: CartRow, items: LoadedItem[]): Promise<CartView> {
   const views: CartItemView[] = items.map((i) => ({
     variantId: i.variantId,
     quantity: i.quantity,
@@ -251,6 +266,27 @@ function buildCartView(cart: CartRow, items: LoadedItem[]): CartView {
     currentPrice: i.currentPrice,
     inStock: i.inStock,
   }));
+
+  const codes = parseCartDiscountCodes(cart.discountCode);
+  let discountTotal = 0;
+  let freeShipping = false;
+  let discountError: string | null = null;
+  if (codes.length > 0 && views.length > 0) {
+    try {
+      const { resolveDiscounts } = await import("../promotions/service");
+      const resolution = await resolveDiscounts(
+        codes,
+        views.map((v) => ({ productId: v.productId, quantity: v.quantity, unitPrice: v.unitPrice })),
+        cart.customerId,
+      );
+      discountTotal = resolution.discountTotal;
+      freeShipping = resolution.freeShipping;
+    } catch (err) {
+      // Codes can sour after being applied (expiry, limits) — report, don't throw.
+      discountError = err instanceof Error ? err.message : "Discount no longer valid";
+    }
+  }
+
   return {
     id: cart.id,
     token: cart.sessionToken,
@@ -260,5 +296,68 @@ function buildCartView(cart: CartRow, items: LoadedItem[]): CartView {
     items: views,
     itemCount: views.reduce((sum, i) => sum + i.quantity, 0),
     subtotal: views.reduce((sum, i) => sum + i.lineTotal, 0),
+    discountCodes: codes,
+    discountTotal,
+    freeShipping,
+    discountError,
   };
+}
+
+/** Apply a discount code to the cart (validated against current contents). */
+export async function applyCartDiscount(token: string, code: string): Promise<CartView> {
+  const db = getDb();
+  const cart = await getMutableCart(token);
+  const items = await loadItems(cart.id);
+  if (items.length === 0) throw badRequest("Add items to the cart before applying a code");
+
+  const codes = [...new Set([...parseCartDiscountCodes(cart.discountCode), code.toUpperCase()])];
+  const { resolveDiscounts } = await import("../promotions/service");
+  // Throws with a specific message when the combination is invalid.
+  await resolveDiscounts(
+    codes,
+    items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
+    cart.customerId,
+  );
+
+  await db
+    .update(carts)
+    .set({ discountCode: codes.join(","), updatedAt: new Date() })
+    .where(eq(carts.id, cart.id));
+  return getCartByToken(token);
+}
+
+/** Subtotal + total weight for shipping-rate resolution (public endpoint). */
+export async function getCartShippingBasis(
+  token: string,
+): Promise<{ subtotal: number; weightGrams: number }> {
+  const db = getDb();
+  const cart = await db.query.carts.findFirst({ where: eq(carts.sessionToken, token) });
+  if (!cart) throw notFound("Cart not found");
+  const rows = await db
+    .select({
+      quantity: cartItems.quantity,
+      unitPrice: cartItems.unitPrice,
+      weightGrams: productVariants.weightGrams,
+    })
+    .from(cartItems)
+    .innerJoin(productVariants, eq(productVariants.id, cartItems.variantId))
+    .where(eq(cartItems.cartId, cart.id));
+  return {
+    subtotal: rows.reduce((sum, r) => sum + r.unitPrice * r.quantity, 0),
+    weightGrams: rows.reduce((sum, r) => sum + (r.weightGrams ?? 0) * r.quantity, 0),
+  };
+}
+
+/** Remove one code (or all codes when none is given). */
+export async function removeCartDiscount(token: string, code?: string): Promise<CartView> {
+  const db = getDb();
+  const cart = await getMutableCart(token);
+  const remaining = code
+    ? parseCartDiscountCodes(cart.discountCode).filter((c) => c !== code.toUpperCase())
+    : [];
+  await db
+    .update(carts)
+    .set({ discountCode: remaining.length ? remaining.join(",") : null, updatedAt: new Date() })
+    .where(eq(carts.id, cart.id));
+  return getCartByToken(token);
 }
