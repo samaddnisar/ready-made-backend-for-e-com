@@ -5,6 +5,7 @@ export * from "./settings/service";
 export * from "./validation/index";
 export * from "./cart/service";
 export * from "./catalog/products";
+export * from "./customers/service";
 export * from "./catalog/taxonomy";
 export * from "./checkout/service";
 export * from "./checkout/totals";

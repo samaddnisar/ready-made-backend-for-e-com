@@ -7,3 +7,4 @@ export * from "./checkout";
 export * from "./orders";
 export * from "./promotions";
 export * from "./shipping";
+export * from "./customers";

@@ -84,11 +84,11 @@ async function resolveSlug(db: Db, title: string, requested?: string, excludeId?
   return uniqueSlug(base, taken);
 }
 
-const minPriceSql = sql<number | null>`(select min(pv.price) from product_variants pv where pv.product_id = ${products.id} and pv.deleted_at is null)`;
-const maxPriceSql = sql<number | null>`(select max(pv.price) from product_variants pv where pv.product_id = ${products.id} and pv.deleted_at is null)`;
-const variantCountSql = sql<number>`(select count(*)::int from product_variants pv where pv.product_id = ${products.id} and pv.deleted_at is null)`;
-const totalStockSql = sql<number | null>`(select sum(i.quantity - i.reserved_qty)::int from inventory i join product_variants pv on pv.id = i.variant_id where pv.product_id = ${products.id} and pv.deleted_at is null and i.track_inventory)`;
-const thumbnailSql = sql<string | null>`(select pi.url from product_images pi where pi.product_id = ${products.id} order by pi.position asc, pi.created_at asc limit 1)`;
+const minPriceSql = sql<number | null>`(select min(pv.price) from product_variants pv where pv.product_id = products.id and pv.deleted_at is null)`;
+const maxPriceSql = sql<number | null>`(select max(pv.price) from product_variants pv where pv.product_id = products.id and pv.deleted_at is null)`;
+const variantCountSql = sql<number>`(select count(*)::int from product_variants pv where pv.product_id = products.id and pv.deleted_at is null)`;
+const totalStockSql = sql<number | null>`(select sum(i.quantity - i.reserved_qty)::int from inventory i join product_variants pv on pv.id = i.variant_id where pv.product_id = products.id and pv.deleted_at is null and i.track_inventory)`;
+const thumbnailSql = sql<string | null>`(select pi.url from product_images pi where pi.product_id = products.id order by pi.position asc, pi.created_at asc limit 1)`;
 
 // ── Admin: list ──────────────────────────────────────────────
 
@@ -103,18 +103,18 @@ export async function listProducts(query: ListProductsQuery): Promise<Paginated<
       or(
         ilike(products.title, term),
         ilike(products.slug, term),
-        sql`exists (select 1 from product_variants pv where pv.product_id = ${products.id} and pv.sku ilike ${term} and pv.deleted_at is null)`,
+        sql`exists (select 1 from product_variants pv where pv.product_id = products.id and pv.sku ilike ${term} and pv.deleted_at is null)`,
       )!,
     );
   }
   if (query.categoryId) {
     filters.push(
-      sql`exists (select 1 from product_categories pc where pc.product_id = ${products.id} and pc.category_id = ${query.categoryId})`,
+      sql`exists (select 1 from product_categories pc where pc.product_id = products.id and pc.category_id = ${query.categoryId})`,
     );
   }
   if (query.collectionId) {
     filters.push(
-      sql`exists (select 1 from product_collections pcl where pcl.product_id = ${products.id} and pcl.collection_id = ${query.collectionId})`,
+      sql`exists (select 1 from product_collections pcl where pcl.product_id = products.id and pcl.collection_id = ${query.collectionId})`,
     );
   }
 
@@ -492,7 +492,7 @@ function collectionRuleToSql(rule: { field: string; operator: string; value: str
       rule.operator === "contains"
         ? sql`(c.slug ilike ${"%" + rule.value + "%"} or c.name ilike ${"%" + rule.value + "%"})`
         : sql`(c.slug = ${rule.value} or c.id::text = ${rule.value})`;
-    return sql`exists (select 1 from product_categories pc join categories c on c.id = pc.category_id and c.deleted_at is null where pc.product_id = ${products.id} and ${match})`;
+    return sql`exists (select 1 from product_categories pc join categories c on c.id = pc.category_id and c.deleted_at is null where pc.product_id = products.id and ${match})`;
   }
   // field === "title"
   return rule.operator === "contains"
@@ -510,7 +510,7 @@ export async function listPublicProducts(
   if (query.q) filters.push(ilike(products.title, `%${query.q}%`));
   if (query.category) {
     filters.push(
-      sql`exists (select 1 from product_categories pc join categories c on c.id = pc.category_id and c.deleted_at is null where pc.product_id = ${products.id} and c.slug = ${query.category})`,
+      sql`exists (select 1 from product_categories pc join categories c on c.id = pc.category_id and c.deleted_at is null where pc.product_id = products.id and c.slug = ${query.category})`,
     );
   }
   if (query.collection) {
@@ -521,11 +521,11 @@ export async function listPublicProducts(
 
     if (collection.isManual || !collection.rules?.length) {
       filters.push(
-        sql`exists (select 1 from product_collections pcl where pcl.product_id = ${products.id} and pcl.collection_id = ${collection.id})`,
+        sql`exists (select 1 from product_collections pcl where pcl.product_id = products.id and pcl.collection_id = ${collection.id})`,
       );
       // Default sort for a manual collection is its curated order.
       if (query.sort === "newest") {
-        manualCollectionOrder = sql`(select pcl.position from product_collections pcl where pcl.product_id = ${products.id} and pcl.collection_id = ${collection.id}) asc`;
+        manualCollectionOrder = sql`(select pcl.position from product_collections pcl where pcl.product_id = products.id and pcl.collection_id = ${collection.id}) asc`;
       }
     } else {
       // Rule-based: membership is computed, not materialized in the join table.
@@ -654,9 +654,9 @@ export async function getRelatedProducts(
     .where(
       and(
         publicVisible,
-        sql`${products.id} <> ${productId}`,
-        sql`${products.id} not in (select pr.related_product_id from product_relations pr where pr.product_id = ${productId})`,
-        sql`exists (select 1 from product_categories pc1 where pc1.product_id = ${products.id} and pc1.category_id in (select pc2.category_id from product_categories pc2 where pc2.product_id = ${productId}))`,
+        sql`products.id <> ${productId}`,
+        sql`products.id not in (select pr.related_product_id from product_relations pr where pr.product_id = ${productId})`,
+        sql`exists (select 1 from product_categories pc1 where pc1.product_id = products.id and pc1.category_id in (select pc2.category_id from product_categories pc2 where pc2.product_id = ${productId}))`,
       ),
     )
     .orderBy(desc(products.createdAt))

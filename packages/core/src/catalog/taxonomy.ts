@@ -14,7 +14,7 @@ import type {
 
 export type CategoryWithCount = typeof categories.$inferSelect & { productCount: number };
 
-const categoryProductCountSql = sql<number>`(select count(*)::int from product_categories pc join products p on p.id = pc.product_id and p.deleted_at is null where pc.category_id = ${categories.id})`;
+const categoryProductCountSql = sql<number>`(select count(*)::int from product_categories pc join products p on p.id = pc.product_id and p.deleted_at is null where pc.category_id = categories.id)`;
 
 async function resolveCategorySlug(db: Db, name: string, requested?: string, excludeId?: string) {
   const base = requested ?? slugify(name);
@@ -154,7 +154,7 @@ export async function listPublicCategories() {
   const db = getDb();
   // Public counts must only reflect what the storefront can actually list —
   // drafts/archived products are excluded from every other public path.
-  const activeProductCountSql = sql<number>`(select count(*)::int from product_categories pc join products p on p.id = pc.product_id and p.deleted_at is null and p.status = 'active' where pc.category_id = ${categories.id})`;
+  const activeProductCountSql = sql<number>`(select count(*)::int from product_categories pc join products p on p.id = pc.product_id and p.deleted_at is null and p.status = 'active' where pc.category_id = categories.id)`;
   return db
     .select({
       id: categories.id,
@@ -177,7 +177,7 @@ export async function listPublicCategories() {
 
 export type CollectionWithCount = typeof collections.$inferSelect & { productCount: number };
 
-const collectionProductCountSql = sql<number>`(select count(*)::int from product_collections pcl join products p on p.id = pcl.product_id and p.deleted_at is null where pcl.collection_id = ${collections.id})`;
+const collectionProductCountSql = sql<number>`(select count(*)::int from product_collections pcl join products p on p.id = pcl.product_id and p.deleted_at is null where pcl.collection_id = collections.id)`;
 
 async function resolveCollectionSlug(db: Db, name: string, requested?: string, excludeId?: string) {
   const base = requested ?? slugify(name);

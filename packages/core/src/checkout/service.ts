@@ -44,7 +44,11 @@ export type CheckoutPreparation = {
  * then creates the Stripe PaymentIntent for totals.grandTotal and
  * records it via recordPaymentIntent — or aborts with abortCheckout.
  */
-export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPreparation> {
+export async function prepareCheckout(
+  input: CheckoutInput,
+  /** Set when the request carried a valid customer session (Phase 6). */
+  customerId?: string | null,
+): Promise<CheckoutPreparation> {
   const db = getDb();
 
   // Opportunistic sweep so stock held by dead checkouts frees up first.
@@ -109,7 +113,7 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
   let freeShipping = false;
   if (codes.length > 0) {
     // Throws with a customer-readable message when a code is invalid.
-    const resolution = await resolveDiscounts(codes, lines, cart.customerId);
+    const resolution = await resolveDiscounts(codes, lines, customerId ?? cart.customerId);
     discountTotal = resolution.discountTotal;
     freeShipping = resolution.freeShipping;
   }
@@ -208,6 +212,7 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
         orderNumber,
         email: input.email,
         cartId: cart.id,
+        customerId: customerId ?? cart.customerId,
         status: "pending",
         subtotal: totals.subtotal,
         discountTotal: totals.discountTotal,

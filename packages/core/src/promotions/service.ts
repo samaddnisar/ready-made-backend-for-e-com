@@ -24,7 +24,7 @@ export const MAX_STACKED_CODES = 3;
 
 export type DiscountListItem = Discount & { redemptionCount: number };
 
-const redemptionCountSql = sql<number>`(select count(*)::int from discount_redemptions dr where dr.discount_id = ${discounts.id})`;
+const redemptionCountSql = sql<number>`(select count(*)::int from discount_redemptions dr where dr.discount_id = discounts.id)`;
 
 export async function listDiscounts(query: ListDiscountsQuery): Promise<Paginated<DiscountListItem>> {
   const db = getDb();

@@ -46,7 +46,7 @@ export async function listOrders(query: ListOrdersQuery): Promise<Paginated<Orde
       status: orders.status,
       grandTotal: orders.grandTotal,
       currency: orders.currency,
-      itemCount: sql<number>`(select coalesce(sum(oi.quantity), 0)::int from order_items oi where oi.order_id = ${orders.id})`,
+      itemCount: sql<number>`(select coalesce(sum(oi.quantity), 0)::int from order_items oi where oi.order_id = orders.id)`,
       createdAt: orders.createdAt,
     })
     .from(orders)
