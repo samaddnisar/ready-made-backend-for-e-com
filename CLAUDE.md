@@ -17,8 +17,10 @@ Source of truth: `ecommerce-boilerplate-spec.md`. Build in the phases listed the
       feature flags, admin shell)
 - [x] Phase 2 — Catalog (products/variants/images, categories, collections, media)
 - [x] Phase 3 — Inventory (stock, race-safe reservations, low-stock, PGlite tests)
-- [ ] Phase 4 — Cart → Checkout → Orders
-- [ ] Phase 5 — Promotions, shipping, tax
+- [x] Phase 4 — Cart → Checkout → Orders (state machine, Stripe PI + webhooks,
+      refunds, order emails, admin orders UI; hardened via adversarial review)
+- [x] Phase 5 — Promotions, shipping, tax (stacking discounts, zones/rates,
+      flat tax; wired into checkout; admin UIs)
 - [ ] Phase 6 — Customers
 - [ ] Phase 7 — Dashboard & analytics
 - [ ] Phase 8 — Toggleable modules

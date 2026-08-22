@@ -66,6 +66,16 @@ export const ORDER_STATUS_BADGE: Record<OrderStatus, BadgeVariant> = {
 
 const ALL_STATUSES = Object.keys(ORDER_STATUS_LABEL) as OrderStatus[];
 
+/** Combined sort value: `${listOrdersQuerySchema.sort}:${listOrdersQuerySchema.order}`. */
+type SortValue = "createdAt:desc" | "createdAt:asc" | "grandTotal:desc" | "grandTotal:asc";
+
+const SORT_OPTIONS: { value: SortValue; label: string }[] = [
+  { value: "createdAt:desc", label: "Newest first" },
+  { value: "createdAt:asc", label: "Oldest first" },
+  { value: "grandTotal:desc", label: "Total: high to low" },
+  { value: "grandTotal:asc", label: "Total: low to high" },
+];
+
 const PAGE_SIZE = 20;
 
 /** "YYYY-MM-DD" from a date input → ISO datetime (start or end of local day). */
@@ -80,6 +90,7 @@ export function OrdersTable({ canWrite: _canWrite }: { canWrite: boolean }) {
   const [status, setStatus] = useState<OrderStatus | "all">("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [sort, setSort] = useState<SortValue>("createdAt:desc");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Paginated<OrderRow> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +115,9 @@ export function OrdersTable({ canWrite: _canWrite }: { canWrite: boolean }) {
     const toIso = toDate ? toIsoBoundary(toDate, "end") : null;
     if (fromIso) params.set("from", fromIso);
     if (toIso) params.set("to", toIso);
+    const [sortField, sortOrder] = sort.split(":") as ["createdAt" | "grandTotal", "asc" | "desc"];
+    params.set("sort", sortField);
+    params.set("order", sortOrder);
 
     setLoading(true);
     apiFetch<Paginated<OrderRow>>(`/api/admin/orders?${params.toString()}`, {
@@ -125,7 +139,7 @@ export function OrdersTable({ canWrite: _canWrite }: { canWrite: boolean }) {
         });
       });
     return () => controller.abort();
-  }, [debouncedQ, status, fromDate, toDate, page, refreshKey]);
+  }, [debouncedQ, status, fromDate, toDate, sort, page, refreshKey]);
 
   const items = useMemo(() => data?.items ?? [], [data]);
   const hasFilters = debouncedQ !== "" || status !== "all" || fromDate !== "" || toDate !== "";
@@ -198,6 +212,24 @@ export function OrdersTable({ canWrite: _canWrite }: { canWrite: boolean }) {
             className="w-40"
           />
         </div>
+        <Select
+          value={sort}
+          onValueChange={(value) => {
+            setSort(value as SortValue);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-44" aria-label="Sort orders">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {showError ? (

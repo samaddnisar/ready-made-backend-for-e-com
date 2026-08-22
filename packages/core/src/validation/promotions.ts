@@ -71,7 +71,8 @@ export const updateDiscountSchema = z
 
 export const listDiscountsQuerySchema = paginationQuerySchema.extend({
   q: z.string().max(100).optional(),
-  active: z.coerce.boolean().optional(),
+  // NOT z.coerce.boolean() — that treats "false" as true (non-empty string).
+  active: z.stringbool().optional(),
 });
 
 /** Storefront: apply/remove codes on a cart. */

@@ -3,7 +3,8 @@ import { paginationQuerySchema, uuidSchema } from "./common";
 
 export const listInventoryQuerySchema = paginationQuerySchema.extend({
   q: z.string().max(200).optional(),
-  lowStockOnly: z.coerce.boolean().default(false),
+  // NOT z.coerce.boolean() — that treats "false" as true (non-empty string).
+  lowStockOnly: z.stringbool().default(false),
 });
 
 export const adjustStockSchema = z
