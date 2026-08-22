@@ -21,10 +21,22 @@ Source of truth: `ecommerce-boilerplate-spec.md`. Build in the phases listed the
       refunds, order emails, admin orders UI; hardened via adversarial review)
 - [x] Phase 5 — Promotions, shipping, tax (stacking discounts, zones/rates,
       flat tax; wired into checkout; admin UIs)
-- [ ] Phase 6 — Customers
-- [ ] Phase 7 — Dashboard & analytics
-- [ ] Phase 8 — Toggleable modules
-- [ ] Phase 9 — Hardening
+- [x] Phase 6 — Customers (accounts, addresses, order history, LTV, authed API)
+- [x] Phase 7 — Dashboard & analytics (revenue/AOV/deltas, SVG chart, top products)
+- [x] Phase 8 — Toggleable modules (reviews, wishlists, gift cards, loyalty,
+      CMS/blog, abandoned carts, newsletter — all gated end-to-end)
+- [ ] Phase 9 — Hardening (rate limiting, users/roles UI, audit log UI, final review)
+
+## Deliberate scope notes
+
+- Gift cards: issuance/validation/ledger only — checkout tender is a later
+  enhancement (needs split-payment + zero-total order flow).
+- Loyalty: earning only (1 pt per major unit on paid orders); redemption at
+  checkout is a later enhancement.
+- Tax: none/flat implemented; stripe_tax mode stored but treated as none
+  until wired per client (§4 architectural).
+- Abandoned-cart detection runs on demand from the admin (Detect now) —
+  wire a cron/scheduled invocation per deployment if wanted.
 
 ## Architecture rules
 

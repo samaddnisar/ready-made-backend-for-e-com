@@ -2,7 +2,8 @@ import "server-only";
 
 import { createElement, type ReactElement } from "react";
 import { Resend } from "resend";
-import { getOrderDetail, getSettings } from "@repo/core";
+import { getAbandonedCartDetail, getOrderDetail, getSettings } from "@repo/core";
+import AbandonedCartEmail from "../emails/abandoned-cart";
 import OrderConfirmationEmail from "../emails/order-confirmation";
 import OrderShippedEmail from "../emails/order-shipped";
 import PaymentFailedEmail from "../emails/payment-failed";
@@ -129,5 +130,99 @@ export async function sendOrderEmail(kind: OrderEmailKind, orderId: string): Pro
     }
   } catch (err) {
     console.error(`[email] Failed to send ${kind} for order ${orderId}:`, err);
+  }
+}
+
+// ── Abandoned-cart reminder (feature: abandoned_cart) ────────
+
+export type AbandonedCartEmailItem = {
+  title: string;
+  variantTitle: string | null;
+  quantity: number;
+  /** unitPrice × quantity, integer minor units. */
+  lineTotal: number;
+};
+
+/** Plain serializable data for the reminder template (money = cents). */
+export type AbandonedCartEmailData = {
+  storeName: string;
+  supportEmail: string | null;
+  /** ISO 4217 code, e.g. "USD". */
+  currency: string;
+  items: AbandonedCartEmailItem[];
+  /** Sum of line totals, integer minor units. */
+  cartValue: number;
+};
+
+/**
+ * Send an abandoned-cart reminder. Same fire-and-forget contract as
+ * `sendOrderEmail`: it NEVER throws — failures are logged — and it no-ops
+ * with a warning when RESEND_API_KEY is unset.
+ */
+export async function sendAbandonedCartEmail(abandonedCartId: string): Promise<void> {
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn(
+        `[email] RESEND_API_KEY is not set — skipping abandoned_cart_reminder for ${abandonedCartId}`,
+      );
+      return;
+    }
+
+    const [cart, settings] = await Promise.all([
+      getAbandonedCartDetail(abandonedCartId),
+      getSettings(),
+    ]);
+
+    if (!cart.email) {
+      console.warn(
+        `[email] No email on record — skipping abandoned_cart_reminder for ${abandonedCartId}`,
+      );
+      return;
+    }
+
+    const emailConfig = settings.emailConfig;
+    const fromAddress = emailConfig?.fromAddress?.trim();
+    const from = fromAddress
+      ? emailConfig?.fromName
+        ? `${emailConfig.fromName} <${fromAddress}>`
+        : fromAddress
+      : process.env.EMAIL_FROM;
+    if (!from) {
+      console.error(
+        `[email] No from-address configured (settings.emailConfig.fromAddress or EMAIL_FROM) — skipping abandoned_cart_reminder for ${abandonedCartId}`,
+      );
+      return;
+    }
+
+    const data: AbandonedCartEmailData = {
+      storeName: settings.storeName,
+      supportEmail: settings.storeEmail ?? null,
+      currency: cart.currency,
+      items: cart.items.map((item) => ({
+        title: item.title,
+        variantTitle: item.variantTitle,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+      })),
+      cartValue: cart.cartValue,
+    };
+
+    _resend ??= new Resend(apiKey);
+    const { error } = await _resend.emails.send({
+      from,
+      to: cart.email,
+      ...(emailConfig?.replyTo ? { replyTo: emailConfig.replyTo } : {}),
+      subject: `You left something behind at ${settings.storeName}`,
+      react: createElement(AbandonedCartEmail, { data }),
+    });
+    if (error) {
+      console.error(
+        `[email] Resend rejected abandoned_cart_reminder for ${abandonedCartId}:`,
+        error,
+      );
+    }
+  } catch (err) {
+    console.error(`[email] Failed to send abandoned_cart_reminder for ${abandonedCartId}:`, err);
   }
 }

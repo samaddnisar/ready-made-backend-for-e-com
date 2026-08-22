@@ -194,6 +194,21 @@ async function handlePaymentSucceeded(event: StripeEventLike): Promise<WebhookOu
     console.error("[stripe] failed to record discount redemptions", err),
   );
 
+  // Toggleable-module hooks — feature-checked, never break the payment path.
+  const { isFeatureEnabled } = await import("../settings/service");
+  if (await isFeatureEnabled("loyalty").catch(() => false)) {
+    const { awardLoyaltyPoints } = await import("../modules/loyalty");
+    await awardLoyaltyPoints(orderId).catch((err) =>
+      console.error("[stripe] failed to award loyalty points", err),
+    );
+  }
+  if (order.cartId && (await isFeatureEnabled("abandoned_cart").catch(() => false))) {
+    const { markRecovered } = await import("../modules/abandoned-carts");
+    await markRecovered(order.cartId, orderId).catch((err) =>
+      console.error("[stripe] failed to mark abandoned cart recovered", err),
+    );
+  }
+
   return { received: true, handled: true, orderId, email: "order_confirmation" };
 }
 
