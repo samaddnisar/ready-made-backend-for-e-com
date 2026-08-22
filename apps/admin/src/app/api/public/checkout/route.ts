@@ -6,6 +6,7 @@ import {
   recordPaymentIntent,
 } from "@repo/core";
 import { ok, parseBody, withPublicApi } from "@/lib/api";
+import { optionalCustomer } from "@/lib/customer-auth";
 import { getStripe } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,9 @@ export const dynamic = "force-dynamic";
  * reservations released) so stock is never stranded.
  */
 export const POST = withPublicApi(async (req) => {
+  const customer = await optionalCustomer(req);
   const input = await parseBody(req, checkoutSchema);
-  const prep = await prepareCheckout(input);
+  const prep = await prepareCheckout(input, customer?.id);
   const stripe = getStripe();
 
   // Kill superseded checkouts' PaymentIntents so stale client secrets from

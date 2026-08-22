@@ -203,6 +203,138 @@ export type CheckoutResult = {
   currency: string;
 };
 
+// ── Customer account payloads (Phase 6; authed via getAuthToken → Bearer) ──
+
+export type CustomerOrderStatus =
+  | "pending"
+  | "paid"
+  | "fulfilled"
+  | "shipped"
+  | "delivered"
+  | "completed"
+  | "partially_refunded"
+  | "refunded"
+  | "cancelled"
+  | "payment_failed";
+
+export type CustomerAddress = {
+  id: string;
+  customerId: string;
+  type: "shipping" | "billing";
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  region: string | null;
+  postalCode: string;
+  /** ISO 3166-1 alpha-2, uppercase. */
+  country: string;
+  phone: string | null;
+  isDefault: boolean;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** ISO timestamp. */
+  updatedAt: string;
+};
+
+export type CustomerProfile = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  marketingOptIn: boolean;
+  /** ISO timestamp. */
+  createdAt: string;
+  addresses: CustomerAddress[];
+};
+
+/** Self-service profile edits — internal admin notes are not editable here. */
+export type CustomerProfileUpdate = {
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  marketingOptIn?: boolean;
+};
+
+export type CustomerAddressInput = {
+  /** Defaults to "shipping" when omitted. */
+  type?: "shipping" | "billing";
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
+  line1: string;
+  line2?: string | null;
+  city: string;
+  region?: string | null;
+  postalCode: string;
+  /** ISO 3166-1 alpha-2 (case-insensitive; stored uppercase). */
+  country: string;
+  phone?: string | null;
+  /** Demotes the previous default of the same type. */
+  isDefault?: boolean;
+};
+
+export type CustomerAddressUpdate = Partial<CustomerAddressInput>;
+
+export type CustomerOrderSummary = {
+  id: string;
+  orderNumber: string;
+  status: CustomerOrderStatus;
+  /** Minor units. */
+  grandTotal: number;
+  currency: string;
+  /** ISO timestamp. */
+  createdAt: string;
+};
+
+/** Purchase-time snapshot line — never live catalog data. */
+export type CustomerOrderItem = {
+  id: string;
+  orderId: string;
+  variantId: string | null;
+  productTitle: string;
+  variantTitle: string | null;
+  sku: string | null;
+  /** Minor units, snapshot at purchase. */
+  unitPrice: number;
+  quantity: number;
+  imageUrl: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** ISO timestamp. */
+  updatedAt: string;
+};
+
+/** Mirror of getCustomerOrder: order columns minus internal notes, plus items. */
+export type CustomerOrderDetail = {
+  id: string;
+  orderNumber: string;
+  customerId: string | null;
+  email: string;
+  status: CustomerOrderStatus;
+  subtotal: number;
+  discountTotal: number;
+  shippingTotal: number;
+  taxTotal: number;
+  /** Minor units. */
+  grandTotal: number;
+  currency: string;
+  /** Address snapshots captured at checkout. */
+  shippingAddress: CheckoutAddress | null;
+  billingAddress: CheckoutAddress | null;
+  shippingRateName: string | null;
+  discountCode: string | null;
+  cartId: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** ISO timestamp. */
+  updatedAt: string;
+  items: CustomerOrderItem[];
+};
+
 export type PublicProductsQuery = {
   page?: number;
   pageSize?: number;
@@ -359,6 +491,51 @@ export function createApiClient(opts: ApiClientOptions) {
        */
       create: (input: CheckoutRequest) =>
         request<CheckoutResult>(opts, "POST", "/api/public/checkout", input),
+    },
+    /**
+     * Signed-in customer account (Phase 6). Every call requires
+     * `getAuthToken` to return a valid Supabase access token — requests
+     * without one fail with 401 unauthorized.
+     */
+    customer: {
+      /** Profile + address book of the signed-in customer. */
+      me: () => request<CustomerProfile>(opts, "GET", "/api/public/customer/me"),
+      /** Self-service profile edits; returns the updated profile. */
+      updateMe: (input: CustomerProfileUpdate) =>
+        request<CustomerProfile>(opts, "PATCH", "/api/public/customer/me", input),
+      /** Paginated order history, newest first. */
+      orders: (query?: { page?: number; pageSize?: number }) =>
+        request<Paginated<CustomerOrderSummary>>(
+          opts,
+          "GET",
+          `/api/public/customer/orders${toQueryString(query)}`,
+        ),
+      /** Order detail — 404 unless the order belongs to this customer. */
+      order: (id: string) =>
+        request<CustomerOrderDetail>(
+          opts,
+          "GET",
+          `/api/public/customer/orders/${encodeURIComponent(id)}`,
+        ),
+      addresses: {
+        list: () => request<CustomerAddress[]>(opts, "GET", "/api/public/customer/addresses"),
+        /** `isDefault: true` demotes the previous default of the same type. */
+        create: (input: CustomerAddressInput) =>
+          request<CustomerAddress>(opts, "POST", "/api/public/customer/addresses", input),
+        update: (id: string, input: CustomerAddressUpdate) =>
+          request<CustomerAddress>(
+            opts,
+            "PATCH",
+            `/api/public/customer/addresses/${encodeURIComponent(id)}`,
+            input,
+          ),
+        remove: (id: string) =>
+          request<{ deleted: boolean }>(
+            opts,
+            "DELETE",
+            `/api/public/customer/addresses/${encodeURIComponent(id)}`,
+          ),
+      },
     },
   };
 }
