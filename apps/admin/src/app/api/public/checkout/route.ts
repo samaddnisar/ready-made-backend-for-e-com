@@ -8,6 +8,7 @@ import {
 import { ok, parseBody, withPublicApi } from "@/lib/api";
 import { optionalCustomer } from "@/lib/customer-auth";
 import { getStripe } from "@/lib/stripe";
+import { withRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
  * total. If Stripe fails, the checkout is aborted (order cancelled,
  * reservations released) so stock is never stranded.
  */
-export const POST = withPublicApi(async (req) => {
+export const POST = withRateLimit("checkout", 10, 60_000, withPublicApi(async (req) => {
   const customer = await optionalCustomer(req);
   const input = await parseBody(req, checkoutSchema);
   const prep = await prepareCheckout(input, customer?.id);
@@ -60,4 +61,4 @@ export const POST = withPublicApi(async (req) => {
     await abortCheckout(prep.order.id, prep.cartId);
     throw new AppError("payment_error", "Could not initialize payment");
   }
-});
+}));

@@ -21,6 +21,7 @@ export * from "./modules/abandoned-carts";
 export * from "./modules/newsletter";
 export * from "./orders/service";
 export * from "./orders/state-machine";
+export * from "./platform/admins";
 export * from "./promotions/service";
 export * from "./shipping/service";
 export * from "./webhooks/stripe";

@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { PageHeader } from "@/components/page-header";
 import { requireReadPage } from "@/lib/auth";
+import { AuditLogClient } from "./audit-log-client";
 
 export const metadata: Metadata = { title: "Audit log" };
 
-export default async function Page() {
+export default async function AuditLogPage() {
   await requireReadPage("audit_log");
-  return <PagePlaceholder title={"Audit log"} description={"Who changed what, when \u2014 every admin mutation is recorded."} phase={9} />;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Audit log"
+        description="Who changed what, when — every admin mutation is recorded."
+      />
+      <AuditLogClient />
+    </div>
+  );
 }

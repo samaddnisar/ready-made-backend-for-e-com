@@ -5,6 +5,7 @@ import {
   unsubscribeFromNewsletter,
 } from "@repo/core";
 import { ok, parseBody, withFeature, withPublicApi } from "@/lib/api";
+import { withRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,24 +15,24 @@ export const dynamic = "force-dynamic";
  * subscribed, or previously unsubscribed (reactivated). 404s when the flag
  * is off (§4).
  */
-export const POST = withFeature(
+export const POST = withRateLimit("newsletter", 10, 60_000, withFeature(
   "newsletter",
   withPublicApi(async (req) => {
     const input = await parseBody(req, newsletterSubscribeSchema);
     await subscribeToNewsletter(input.email, input.source);
     return ok({ subscribed: true });
   }),
-);
+));
 
 /**
  * DELETE /api/public/newsletter — unsubscribe. Always { subscribed: false },
  * even for emails that were never subscribed — no existence leak.
  */
-export const DELETE = withFeature(
+export const DELETE = withRateLimit("newsletter", 10, 60_000, withFeature(
   "newsletter",
   withPublicApi(async (req) => {
     const input = await parseBody(req, newsletterUnsubscribeSchema);
     await unsubscribeFromNewsletter(input.email);
     return ok({ subscribed: false });
   }),
-);
+));

@@ -1,5 +1,6 @@
 import { validateGiftCard, validateGiftCardSchema } from "@repo/core";
 import { ok, parseBody, withFeature, withPublicApi } from "@/lib/api";
+import { withRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,10 @@ export const dynamic = "force-dynamic";
  * disabled, depleted, expired) is the identical { valid: false } — no
  * existence oracle, no customer data. 404s when the flag is off (§4).
  */
-export const POST = withFeature(
+export const POST = withRateLimit("gift-card-validate", 10, 60_000, withFeature(
   "gift_cards",
   withPublicApi(async (req) => {
     const input = await parseBody(req, validateGiftCardSchema);
     return ok(await validateGiftCard(input.code));
   }),
-);
+));

@@ -35,6 +35,23 @@ pnpm dev                    # admin at http://localhost:3000
 
 To create the first admin: create the user in Supabase Auth (dashboard → Authentication),
 then re-run `pnpm db:seed` with `SEED_ADMIN_EMAIL=<email> SEED_ADMIN_AUTH_USER_ID=<auth uuid>`.
+Further admins are invited from the admin UI (Users & roles → Invite admin).
+
+## Deployment checklist
+
+1. **Supabase**: new project → set env vars → `pnpm db:migrate && pnpm db:seed`.
+   Create a **public storage bucket named `media`** (Storage → New bucket) for the
+   media library. RLS ships default-deny — see the per-client checklist below.
+2. **Stripe**: set `STRIPE_SECRET_KEY`, then add a webhook endpoint pointing at
+   `https://admin.<domain>/api/webhooks/stripe` subscribed to
+   `payment_intent.succeeded`, `payment_intent.payment_failed`,
+   `payment_intent.canceled`, `refund.created`, `refund.updated`, `refund.failed`
+   — and set the signing secret as `STRIPE_WEBHOOK_SECRET`.
+3. **Resend**: set `RESEND_API_KEY` + `EMAIL_FROM` (verified domain) for order emails.
+4. **Vercel**: deploy `apps/admin` with all env vars; the storefront deploys separately.
+5. Rate limiting is in-memory per instance (blunts bursts on serverless). For hard
+   multi-instance limits swap `apps/admin/src/lib/rate-limit.ts`'s `consume` for a
+   Redis/Upstash implementation — call sites don't change.
 
 ## Conventions
 
