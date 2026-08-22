@@ -20,15 +20,31 @@ export const dynamic = "force-dynamic";
 export const POST = withPublicApi(async (req) => {
   const input = await parseBody(req, checkoutSchema);
   const prep = await prepareCheckout(input);
+  const stripe = getStripe();
+
+  // Kill superseded checkouts' PaymentIntents so stale client secrets from
+  // an earlier attempt can no longer capture money. Best-effort: an intent
+  // that already succeeded/cancelled simply errors and is skipped.
+  for (const staleId of prep.stalePaymentIntentIds) {
+    try {
+      await stripe.paymentIntents.cancel(staleId);
+    } catch (err) {
+      console.warn(`[checkout] could not cancel stale PaymentIntent ${staleId}`, err);
+    }
+  }
 
   try {
-    const stripe = getStripe();
-    const intent = await stripe.paymentIntents.create({
-      amount: prep.totals.grandTotal,
-      currency: prep.order.currency.toLowerCase(),
-      metadata: { order_id: prep.order.id, cart_id: prep.cartId },
-      automatic_payment_methods: { enabled: true },
-    });
+    const intent = await stripe.paymentIntents.create(
+      {
+        amount: prep.totals.grandTotal,
+        currency: prep.order.currency.toLowerCase(),
+        metadata: { order_id: prep.order.id, cart_id: prep.cartId },
+        automatic_payment_methods: { enabled: true },
+      },
+      // §9: idempotency key — a network-level retry of this call must not
+      // mint a second chargeable intent for the same order.
+      { idempotencyKey: `pi-create-${prep.order.id}` },
+    );
     await recordPaymentIntent(prep.order.id, intent.id, prep.totals.grandTotal, prep.order.currency);
     return ok({
       orderId: prep.order.id,

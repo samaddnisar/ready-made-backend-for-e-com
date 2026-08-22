@@ -27,6 +27,12 @@ export type CheckoutPreparation = {
   order: typeof orders.$inferSelect;
   totals: Totals;
   cartId: string;
+  /**
+   * PaymentIntents belonging to orders this checkout superseded. The route
+   * must cancel them at Stripe (best-effort) so stale client secrets from
+   * an earlier checkout attempt can no longer capture money.
+   */
+  stalePaymentIntentIds: string[];
 };
 
 /**
@@ -100,15 +106,37 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
     if (!imageByProduct.has(img.productId)) imageByProduct.set(img.productId, img.url);
   }
 
-  const order = await db.transaction(async (tx) => {
-    // A re-submitted checkout supersedes this cart's earlier pending order.
+  const { order, stalePaymentIntentIds } = await db.transaction(async (tx) => {
+    // Serialize checkouts per cart: the row lock makes concurrent
+    // prepareCheckout calls queue, so exactly one pending order survives.
+    const [lockedCart] = await tx.select().from(carts).where(eq(carts.id, cart.id)).for("update");
+    if (!lockedCart || lockedCart.status !== "active" || lockedCart.expiresAt < new Date()) {
+      throw new AppError("cart_expired", "This cart is no longer available for checkout");
+    }
+
+    // A re-submitted checkout supersedes this cart's earlier pending or
+    // failed order — and its PaymentIntent must die with it.
     const stale = await tx
       .select({ id: orders.id })
       .from(orders)
-      .where(and(eq(orders.cartId, cart.id), eq(orders.status, "pending")));
+      .where(
+        and(eq(orders.cartId, cart.id), inArray(orders.status, ["pending", "payment_failed"])),
+      );
     for (const s of stale) {
       await transitionOrder(s.id, "cancelled", "system", "Superseded by a new checkout", tx);
     }
+    const stalePIs =
+      stale.length > 0
+        ? await tx
+            .select({ id: payments.stripePaymentIntentId, status: payments.status })
+            .from(payments)
+            .where(
+              inArray(
+                payments.orderId,
+                stale.map((s) => s.id),
+              ),
+            )
+        : [];
 
     // Via select() rather than execute() — postgres-js and PGlite disagree
     // on execute()'s return shape, and tests run on PGlite.
@@ -149,10 +177,15 @@ export async function prepareCheckout(input: CheckoutInput): Promise<CheckoutPre
       })),
     );
 
-    return order;
+    return {
+      order,
+      stalePaymentIntentIds: stalePIs
+        .filter((p) => p.status === "pending" || p.status === "processing")
+        .map((p) => p.id),
+    };
   });
 
-  return { order, totals, cartId: cart.id };
+  return { order, totals, cartId: cart.id, stalePaymentIntentIds };
 }
 
 /** Record the PaymentIntent the route created for this order. */

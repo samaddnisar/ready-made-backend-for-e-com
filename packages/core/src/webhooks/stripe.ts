@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { carts, orders, payments, refunds, webhookEvents } from "../db/schema";
-import { consumeCartReservations, releaseCartReservations } from "../inventory/service";
+import { carts, orderItems, orders, payments, refunds, webhookEvents } from "../db/schema";
+import { consumeOrderStock, releaseCartReservations } from "../inventory/service";
 import { transitionOrder } from "../orders/state-machine";
 
 /**
@@ -26,6 +26,12 @@ export type WebhookOutcome = {
   orderId?: string;
   /** Email the route should send (kept out of core — Resend lives app-side). */
   email?: "order_confirmation" | "payment_failed" | null;
+  /**
+   * Money arrived in a state we won't auto-resolve (paid after cancel,
+   * amount mismatch). The payment is recorded; an admin must reconcile
+   * (refund or manually fulfil). Never triggers an infinite retry.
+   */
+  reconciliation?: "paid_after_cancelled" | "amount_mismatch";
 };
 
 /** Returns false when this event was already processed (skip), true to proceed. */
@@ -72,6 +78,7 @@ export async function processStripeEvent(event: StripeEventLike): Promise<Webhoo
       case "payment_intent.canceled":
         outcome = await handlePaymentFailed(event);
         break;
+      case "refund.created":
       case "refund.updated":
       case "refund.failed":
       case "charge.refund.updated":
@@ -100,59 +107,109 @@ async function handlePaymentSucceeded(event: StripeEventLike): Promise<WebhookOu
   const db = getDb();
   const intent = event.data.object as {
     id: string;
-    metadata?: { order_id?: string };
+    amount_received?: number;
+    currency?: string;
     payment_method_types?: string[];
   };
 
+  // ONLY our own recorded PaymentIntents count. No metadata fallback: a PI
+  // from another integration on the same Stripe account must never be able
+  // to flip an order to paid (metadata is attacker-influenceable there).
   const payment = await findPaymentByIntent(intent.id);
-  const orderId = payment?.orderId ?? intent.metadata?.order_id;
-  if (!orderId) {
-    // A PI we didn't create (e.g. another product on the same Stripe account).
-    return { received: true, handled: false };
+  if (!payment) return { received: true, handled: false };
+  const orderId = payment.orderId;
+
+  await db
+    .update(payments)
+    .set({
+      status: "succeeded",
+      method: intent.payment_method_types?.[0] ?? payment.method,
+      updatedAt: new Date(),
+    })
+    .where(eq(payments.id, payment.id));
+
+  // The charged amount must match what we quoted (§9). A mismatch is never
+  // auto-marked paid — it is flagged for reconciliation.
+  const amountMismatch =
+    (intent.amount_received !== undefined && intent.amount_received !== payment.amount) ||
+    (intent.currency !== undefined &&
+      intent.currency.toLowerCase() !== payment.currency.toLowerCase());
+  if (amountMismatch) {
+    console.error(
+      `[stripe] amount/currency mismatch on ${intent.id}: charged ${intent.amount_received} ${intent.currency}, expected ${payment.amount} ${payment.currency} (order ${orderId})`,
+    );
+    return { received: true, handled: true, orderId, email: null, reconciliation: "amount_mismatch" };
   }
 
-  if (payment) {
-    await db
-      .update(payments)
-      .set({
-        status: "succeeded",
-        method: intent.payment_method_types?.[0] ?? payment.method,
-        updatedAt: new Date(),
-      })
-      .where(eq(payments.id, payment.id));
-  }
+  const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
+  if (!order) return { received: true, handled: false };
 
-  // Idempotent: an already-paid order returns fromStatus "paid" → no side effects.
-  const result = await transitionOrder(orderId, "paid", "webhook:stripe");
-  if (result.fromStatus === "paid") {
+  if (order.status === "paid") {
+    // Duplicate delivery under a new event id — nothing more to do.
     return { received: true, handled: true, orderId, email: null };
   }
 
-  if (result.order.cartId) {
-    await consumeCartReservations(result.order.cartId, orderId);
-    await db
-      .update(carts)
-      .set({ status: "converted", updatedAt: new Date() })
-      .where(eq(carts.id, result.order.cartId));
+  if (order.status === "cancelled") {
+    // Money arrived for an order we cancelled (stale client secret). Record
+    // it and surface for admin reconciliation — never an infinite retry.
+    console.error(`[stripe] payment succeeded for cancelled order ${order.orderNumber} (${orderId})`);
+    return {
+      received: true,
+      handled: true,
+      orderId,
+      email: null,
+      reconciliation: "paid_after_cancelled",
+    };
   }
+
+  // Atomic: status flip(s) + stock consumption + cart conversion commit
+  // together, keyed on the pending→paid transition (exactly-once).
+  await db.transaction(async (tx) => {
+    if (order.status === "payment_failed") {
+      // Declined attempt retried successfully on the same PaymentIntent —
+      // recover through the legal payment_failed→pending edge.
+      await transitionOrder(orderId, "pending", "webhook:stripe", "Payment retried", tx);
+    }
+    const result = await transitionOrder(orderId, "paid", "webhook:stripe", undefined, tx);
+    if (result.fromStatus === "paid") return;
+
+    const items = await tx
+      .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+    // Consumes live holds first; falls back to direct decrement when the
+    // holds were released (declined attempt) or swept (TTL expiry).
+    await consumeOrderStock(orderId, order.cartId, items, tx);
+
+    if (order.cartId) {
+      await tx
+        .update(carts)
+        .set({ status: "converted", updatedAt: new Date() })
+        .where(eq(carts.id, order.cartId));
+    }
+  });
+
+  const { recordDiscountRedemptions } = await import("../promotions/service");
+  await recordDiscountRedemptions(orderId).catch((err) =>
+    console.error("[stripe] failed to record discount redemptions", err),
+  );
 
   return { received: true, handled: true, orderId, email: "order_confirmation" };
 }
 
 async function handlePaymentFailed(event: StripeEventLike): Promise<WebhookOutcome> {
   const db = getDb();
-  const intent = event.data.object as { id: string; metadata?: { order_id?: string } };
+  const intent = event.data.object as { id: string };
 
+  // Same trust boundary as the succeeded handler: our recorded PIs only.
   const payment = await findPaymentByIntent(intent.id);
-  const orderId = payment?.orderId ?? intent.metadata?.order_id;
-  if (!orderId) return { received: true, handled: false };
+  if (!payment) return { received: true, handled: false };
+  const orderId = payment.orderId;
 
-  if (payment) {
-    await db
-      .update(payments)
-      .set({ status: "failed", updatedAt: new Date() })
-      .where(eq(payments.id, payment.id));
-  }
+  await db
+    .update(payments)
+    .set({ status: "failed", updatedAt: new Date() })
+    .where(eq(payments.id, payment.id));
 
   const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
   if (!order) return { received: true, handled: false };
@@ -160,8 +217,10 @@ async function handlePaymentFailed(event: StripeEventLike): Promise<WebhookOutco
   // Only a still-pending order flips; a paid order is never demoted by a
   // late/duplicate failure event.
   if (order.status === "pending") {
-    await transitionOrder(orderId, "payment_failed", "webhook:stripe", "Stripe payment failed");
-    if (order.cartId) await releaseCartReservations(order.cartId);
+    await db.transaction(async (tx) => {
+      await transitionOrder(orderId, "payment_failed", "webhook:stripe", "Stripe payment failed", tx);
+      if (order.cartId) await releaseCartReservations(order.cartId, tx);
+    });
     return { received: true, handled: true, orderId, email: "payment_failed" };
   }
   return { received: true, handled: true, orderId, email: null };
@@ -169,9 +228,13 @@ async function handlePaymentFailed(event: StripeEventLike): Promise<WebhookOutco
 
 async function handleRefundUpdated(event: StripeEventLike): Promise<WebhookOutcome> {
   const db = getDb();
-  const refund = event.data.object as { id: string; status?: string };
-  const row = await db.query.refunds.findFirst({ where: eq(refunds.stripeRefundId, refund.id) });
-  if (!row) return { received: true, handled: false };
+  const refund = event.data.object as {
+    id: string;
+    status?: string;
+    amount?: number;
+    reason?: string | null;
+    payment_intent?: string | null;
+  };
 
   const status =
     refund.status === "succeeded"
@@ -181,10 +244,37 @@ async function handleRefundUpdated(event: StripeEventLike): Promise<WebhookOutco
         : refund.status === "canceled"
           ? "cancelled"
           : "pending";
-  await db
-    .update(refunds)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(refunds.id, row.id));
+
+  let row = await db.query.refunds.findFirst({ where: eq(refunds.stripeRefundId, refund.id) });
+
+  if (!row) {
+    // Refund issued outside the admin (Stripe Dashboard/API). Record it so
+    // local refundable totals and order status never silently diverge.
+    if (!refund.payment_intent || typeof refund.amount !== "number") {
+      return { received: true, handled: false };
+    }
+    const payment = await findPaymentByIntent(refund.payment_intent);
+    if (!payment) return { received: true, handled: false };
+    const [inserted] = await db
+      .insert(refunds)
+      .values({
+        paymentId: payment.id,
+        amount: refund.amount,
+        reason: refund.reason ?? "Issued via Stripe Dashboard",
+        stripeRefundId: refund.id,
+        status,
+        adminUserId: null,
+      })
+      .onConflictDoNothing()
+      .returning();
+    row = inserted ?? (await db.query.refunds.findFirst({ where: eq(refunds.stripeRefundId, refund.id) }));
+    if (!row) return { received: true, handled: false };
+  } else {
+    await db
+      .update(refunds)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(refunds.id, row.id));
+  }
 
   // Order-level refund status is recomputed by the orders service.
   const { syncOrderRefundStatus } = await import("../orders/service");

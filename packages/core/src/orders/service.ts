@@ -148,6 +148,101 @@ export async function getRefundContext(orderId: string): Promise<RefundContext> 
 }
 
 /**
+ * Race-safe refund start: locks the order row, recomputes the refundable
+ * amount under the lock (pending refunds count against it), and inserts the
+ * local refunds row BEFORE any money moves — the row is the reservation.
+ * The route then executes the Stripe refund (with an idempotency key
+ * derived from this row's id) and calls finalizeRefund with the result, so
+ * every executed Stripe refund always has a local record.
+ */
+export async function beginRefund(
+  orderId: string,
+  input: { amount: number; reason?: string },
+  adminUserId: string,
+): Promise<{ refund: typeof refunds.$inferSelect; payment: typeof payments.$inferSelect }> {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
+    if (!order) throw notFound("Order not found");
+
+    const paymentRows = await tx.select().from(payments).where(eq(payments.orderId, orderId));
+    const payment = paymentRows.find((p) => p.status === "succeeded");
+    if (!payment) throw badRequest("Order has no successful payment to refund");
+
+    const refundRows = paymentRows.length
+      ? await tx
+          .select()
+          .from(refunds)
+          .where(
+            inArray(
+              refunds.paymentId,
+              paymentRows.map((p) => p.id),
+            ),
+          )
+      : [];
+    const paid = paymentRows
+      .filter((p) => p.status === "succeeded")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const held = refundRows
+      .filter((r) => r.status === "succeeded" || r.status === "pending")
+      .reduce((sum, r) => sum + r.amount, 0);
+    const refundable = Math.max(0, paid - held);
+    if (input.amount > refundable) {
+      throw badRequest(`Refund of ${input.amount} exceeds the refundable amount (${refundable})`);
+    }
+
+    const [refund] = await tx
+      .insert(refunds)
+      .values({
+        paymentId: payment.id,
+        amount: input.amount,
+        reason: input.reason ?? null,
+        stripeRefundId: null,
+        status: "pending",
+        adminUserId,
+      })
+      .returning();
+    if (!refund) throw new Error("Refund insert failed");
+    return { refund, payment };
+  });
+}
+
+/** Attach the Stripe result to a beginRefund row and sync the order status. */
+export async function finalizeRefund(
+  refundId: string,
+  result: { stripeRefundId?: string; status: "pending" | "succeeded" | "failed" | "cancelled" },
+  actor: string,
+): Promise<typeof refunds.$inferSelect> {
+  const db = getDb();
+  const [row] = await db
+    .update(refunds)
+    .set({
+      ...(result.stripeRefundId ? { stripeRefundId: result.stripeRefundId } : {}),
+      status: result.status,
+      updatedAt: new Date(),
+    })
+    .where(eq(refunds.id, refundId))
+    .returning();
+  if (!row) throw notFound("Refund not found");
+
+  const payment = await db.query.payments.findFirst({ where: eq(payments.id, row.paymentId) });
+  if (payment) await syncOrderRefundStatus(payment.orderId, actor);
+  return row;
+}
+
+/** PaymentIntents on this order that are still cancellable at Stripe. */
+export async function getCancellablePaymentIntents(orderId: string): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: payments.stripePaymentIntentId, status: payments.status })
+    .from(payments)
+    .where(eq(payments.orderId, orderId));
+  return rows
+    .filter((p) => p.status === "pending" || p.status === "processing")
+    .map((p) => p.id);
+}
+
+/**
  * Record a refund the route has already executed with Stripe, then bring
  * the order's status in line (partially_refunded / refunded).
  */

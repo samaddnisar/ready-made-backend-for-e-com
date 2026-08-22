@@ -305,7 +305,8 @@ async function releaseCartReservationsTx(tx: Tx, cartId: string): Promise<void> 
 }
 
 /** Release a cart's holds (payment failed, cart abandoned, checkout restarted). */
-export async function releaseCartReservations(cartId: string): Promise<void> {
+export async function releaseCartReservations(cartId: string, txIn?: Tx): Promise<void> {
+  if (txIn) return releaseCartReservationsTx(txIn, cartId);
   const db = getDb();
   await db.transaction(async (tx) => releaseCartReservationsTx(tx, cartId));
 }
@@ -313,10 +314,15 @@ export async function releaseCartReservations(cartId: string): Promise<void> {
 /**
  * Convert a cart's holds into a real stock decrement (order paid).
  * Quantity and reserved both drop; the reservation is marked consumed.
+ * Reservation-only semantics (idempotent — consumed holds are skipped).
  */
-export async function consumeCartReservations(cartId: string, orderId: string): Promise<void> {
-  const db = getDb();
-  await db.transaction(async (tx) => {
+export async function consumeCartReservations(
+  cartId: string,
+  orderId: string,
+  txIn?: Tx,
+): Promise<Map<string, number>> {
+  const run = async (tx: Tx): Promise<Map<string, number>> => {
+    const consumed = new Map<string, number>();
     const active = await tx
       .select()
       .from(inventoryReservations)
@@ -342,8 +348,60 @@ export async function consumeCartReservations(cartId: string, orderId: string): 
         .update(inventoryReservations)
         .set({ consumedAt: new Date(), orderId })
         .where(eq(inventoryReservations.id, r.id));
+      consumed.set(r.variantId, (consumed.get(r.variantId) ?? 0) + r.quantity);
     }
-  });
+    return consumed;
+  };
+  if (txIn) return run(txIn);
+  const db = getDb();
+  return db.transaction(run);
+}
+
+/**
+ * Paid-order stock consumption with an expired-holds fallback: consume any
+ * active reservations, then decrement remaining order-item quantities
+ * directly (the 30-min hold may have been swept before payment landed —
+ * the customer still paid, so stock must drop; clamped at zero with an
+ * oversell alert). NOT idempotent — call exactly once, inside the
+ * pending→paid transition's transaction.
+ */
+export async function consumeOrderStock(
+  orderId: string,
+  cartId: string | null,
+  items: { variantId: string | null; quantity: number }[],
+  txIn?: Tx,
+): Promise<void> {
+  const run = async (tx: Tx): Promise<void> => {
+    const consumed = cartId
+      ? await consumeCartReservations(cartId, orderId, tx)
+      : new Map<string, number>();
+
+    for (const item of items) {
+      if (!item.variantId) continue;
+      const shortfall = item.quantity - (consumed.get(item.variantId) ?? 0);
+      if (shortfall <= 0) continue;
+
+      const [inv] = await tx
+        .select()
+        .from(inventory)
+        .where(eq(inventory.variantId, item.variantId))
+        .for("update");
+      if (!inv || !inv.trackInventory) continue;
+
+      if (inv.quantity < shortfall) {
+        console.error(
+          `[inventory] oversell on paid order ${orderId}: variant ${item.variantId} needs ${shortfall}, on hand ${inv.quantity}`,
+        );
+      }
+      await tx
+        .update(inventory)
+        .set({ quantity: Math.max(0, inv.quantity - shortfall), updatedAt: new Date() })
+        .where(eq(inventory.id, inv.id));
+    }
+  };
+  if (txIn) return run(txIn);
+  const db = getDb();
+  return db.transaction(run);
 }
 
 /**
