@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { shippingRates, shippingZones, taxSettings } from "../db/schema";
 import { notFound } from "../errors";
@@ -161,6 +161,14 @@ export async function resolveShippingRates(
       type: r.type,
       price: r.price,
     }));
+}
+
+/** Whether the store has ANY shipping zones set up (checkout uses this to
+ *  distinguish "shipping not configured" from "we can't ship there"). */
+export async function hasShippingConfigured(): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db.select({ n: sql`count(*)::int` }).from(shippingZones);
+  return Number(row?.n ?? 0) > 0;
 }
 
 // ── Tax settings ─────────────────────────────────────────────

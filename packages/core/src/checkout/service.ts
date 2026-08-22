@@ -19,7 +19,7 @@ import {
 } from "../inventory/service";
 import { transitionOrder } from "../orders/state-machine";
 import { resolveDiscounts } from "../promotions/service";
-import { getTaxSettings, resolveShippingRates } from "../shipping/service";
+import { getTaxSettings, hasShippingConfigured, resolveShippingRates } from "../shipping/service";
 import { computeTotals, type Totals } from "./totals";
 import type { CheckoutInput } from "../validation/checkout";
 
@@ -59,7 +59,9 @@ export async function prepareCheckout(
   });
   if (!cart) throw notFound("Cart not found");
   if (cart.status === "converted") throw badRequest("This cart has already been checked out");
-  if (cart.expiresAt < new Date() || cart.status !== "active") {
+  // "abandoned" carts with time left revive on checkout (reminder clicks).
+  const resumable = cart.status === "active" || cart.status === "abandoned";
+  if (cart.expiresAt < new Date() || !resumable) {
     throw new AppError("cart_expired", "This cart has expired — start a new one");
   }
 
@@ -136,6 +138,10 @@ export async function prepareCheckout(
     // The store has shipping configured — the storefront must pick a rate
     // (GET /api/public/shipping-rates lists them). Never silently ship free.
     throw badRequest("Select a shipping rate", { rates });
+  } else if (await hasShippingConfigured()) {
+    // Zones exist but none serves this destination (or no rate's conditions
+    // match this cart) — refusing beats silently shipping for free.
+    throw badRequest("We can't ship to this destination");
   }
 
   // ── Tax (Phase 5): none / flat. stripe_tax is an architectural add-on
@@ -171,8 +177,15 @@ export async function prepareCheckout(
     // Serialize checkouts per cart: the row lock makes concurrent
     // prepareCheckout calls queue, so exactly one pending order survives.
     const [lockedCart] = await tx.select().from(carts).where(eq(carts.id, cart.id)).for("update");
-    if (!lockedCart || lockedCart.status !== "active" || lockedCart.expiresAt < new Date()) {
+    if (
+      !lockedCart ||
+      (lockedCart.status !== "active" && lockedCart.status !== "abandoned") ||
+      lockedCart.expiresAt < new Date()
+    ) {
       throw new AppError("cart_expired", "This cart is no longer available for checkout");
+    }
+    if (lockedCart.status === "abandoned") {
+      await tx.update(carts).set({ status: "active", updatedAt: new Date() }).where(eq(carts.id, cart.id));
     }
 
     // A re-submitted checkout supersedes this cart's earlier pending or

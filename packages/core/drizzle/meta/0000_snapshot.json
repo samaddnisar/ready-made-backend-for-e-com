@@ -1,5 +1,5 @@
 {
-  "id": "cca57516-6d8c-4b6e-aca5-dd7cf093d081",
+  "id": "71d0f1e8-f07c-4c12-a24f-2581f813fad1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -5001,7 +5001,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}

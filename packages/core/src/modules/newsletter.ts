@@ -153,9 +153,18 @@ export async function exportActiveNewsletterEmails(): Promise<string[]> {
   return rows.map((r) => r.email);
 }
 
-/** Quote a CSV field when it contains a delimiter, quote or newline. */
-const csvField = (value: string): string =>
-  /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+/**
+ * Quote a CSV field when it contains a delimiter, quote or newline; prefix
+ * formula-leading characters (= + - @) with a single quote so a crafted
+ * "email" can never execute as a formula when the export is opened in a
+ * spreadsheet (CSV injection defense — §9).
+ */
+const csvField = (value: string): string => {
+  const neutralized = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(neutralized)
+    ? `"${neutralized.replaceAll('"', '""')}"`
+    : neutralized;
+};
 
 /** CSV document (header `email,subscribedAt`) of all active subscribers. */
 export async function exportActiveNewsletterCsv(): Promise<string> {

@@ -317,7 +317,9 @@ export async function updateAddress(
     });
     if (!existing) throw notFound("Address not found");
 
-    const set = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+    const set: Record<string, unknown> = Object.fromEntries(
+      Object.entries(input).filter(([, v]) => v !== undefined),
+    );
     if (input.isDefault) {
       await tx
         .update(addresses)
@@ -325,6 +327,10 @@ export async function updateAddress(
         .where(
           and(eq(addresses.customerId, customerId), eq(addresses.type, input.type ?? existing.type)),
         );
+    } else if (input.type && input.type !== existing.type && existing.isDefault) {
+      // Moving a default address to the other type without claiming default
+      // there would create two defaults of the target type — drop the flag.
+      set.isDefault = false;
     }
     const [row] = await tx
       .update(addresses)

@@ -64,7 +64,9 @@ export const wishlists = pgTable(
     name: text("name").notNull().default("Wishlist"),
     ...timestamps(),
   },
-  (t) => [index("wishlists_customer_id_idx").on(t.customerId)],
+  // One implicit wishlist per customer — the unique index makes the
+  // find-then-insert bootstrap race-safe (shadow rows would orphan items).
+  (t) => [uniqueIndex("wishlists_customer_id_idx").on(t.customerId)],
 ).enableRLS();
 
 export const wishlistItems = pgTable(

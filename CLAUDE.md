@@ -25,7 +25,11 @@ Source of truth: `ecommerce-boilerplate-spec.md`. Build in the phases listed the
 - [x] Phase 7 — Dashboard & analytics (revenue/AOV/deltas, SVG chart, top products)
 - [x] Phase 8 — Toggleable modules (reviews, wishlists, gift cards, loyalty,
       CMS/blog, abandoned carts, newsletter — all gated end-to-end)
-- [ ] Phase 9 — Hardening (rate limiting, users/roles UI, audit log UI, final review)
+- [x] Phase 9 — Hardening (rate limiting, users/roles + audit log UIs, image
+      optimization, privilege-escalation guards, final adversarial review — done)
+
+**Status: all spec phases complete.** Future work lands as incremental
+migrations (never regenerate 0000 once any client has cloned).
 
 ## Deliberate scope notes
 

@@ -50,13 +50,14 @@ function newCartToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export async function createCart(): Promise<CartView> {
+export async function createCart(customerId?: string | null): Promise<CartView> {
   const db = getDb();
   const settings = await getSettings();
   const [cart] = await db
     .insert(carts)
     .values({
       sessionToken: newCartToken(),
+      customerId: customerId ?? null,
       currency: settings.currency,
       expiresAt: new Date(Date.now() + CART_TTL_DAYS * 86_400_000),
     })
@@ -73,7 +74,17 @@ async function getMutableCart(token: string): Promise<CartRow> {
   const cart = await db.query.carts.findFirst({ where: eq(carts.sessionToken, token) });
   if (!cart) throw notFound("Cart not found");
   if (cart.status === "converted") throw conflict("This cart has already been checked out");
-  if (cart.expiresAt < new Date() || cart.status === "expired" || cart.status === "abandoned") {
+  if (cart.status === "abandoned" && cart.expiresAt >= new Date()) {
+    // A customer returning from an abandoned-cart reminder must be able to
+    // resume — revive the cart instead of dead-ending them.
+    const [revived] = await db
+      .update(carts)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(carts.id, cart.id))
+      .returning();
+    return revived ?? cart;
+  }
+  if (cart.expiresAt < new Date() || cart.status !== "active") {
     if (cart.status === "active") {
       await db.update(carts).set({ status: "expired" }).where(eq(carts.id, cart.id));
     }

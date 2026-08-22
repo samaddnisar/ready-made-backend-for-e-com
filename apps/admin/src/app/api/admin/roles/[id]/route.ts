@@ -1,4 +1,12 @@
-import { deleteRole, notFound, updateRole, updateRoleSchema, uuidSchema } from "@repo/core";
+import {
+  deleteRole,
+  forbidden,
+  isPrivilegedRolePermissions,
+  notFound,
+  updateRole,
+  updateRoleSchema,
+  uuidSchema,
+} from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
@@ -10,6 +18,17 @@ export const PATCH = withAdminApi(
     const { id } = await params;
     if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     const input = await parseBody(req, updateRoleSchema);
+
+    // Escalation guard: widening a role into user-management (or a beyond-
+    // read global wildcard) is super-admin-only.
+    if (
+      input.permissions &&
+      isPrivilegedRolePermissions(input.permissions) &&
+      admin.roleName !== "super_admin"
+    ) {
+      throw forbidden("Only a super admin can grant these permissions");
+    }
+
     // Core rejects edits to built-in roles (409 with a clear message).
     const role = await updateRole(id, input);
 

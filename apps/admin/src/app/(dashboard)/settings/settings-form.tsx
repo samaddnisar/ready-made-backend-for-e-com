@@ -30,6 +30,7 @@ type SettingsInitial = {
   currency: string;
   logoUrl: string | null;
   featureFlags: FeatureFlags;
+  emailConfig: { fromName?: string; fromAddress?: string; replyTo?: string } | null;
 };
 
 const FEATURE_DESCRIPTIONS: Record<FeatureKey, string> = {
@@ -60,6 +61,28 @@ export function SettingsForm({
     logoUrl: initial.logoUrl ?? "",
   });
   const [flags, setFlags] = useState<FeatureFlags>(initial.featureFlags);
+  const [emailCfg, setEmailCfg] = useState({
+    fromName: initial.emailConfig?.fromName ?? "",
+    fromAddress: initial.emailConfig?.fromAddress ?? "",
+    replyTo: initial.emailConfig?.replyTo ?? "",
+  });
+
+  async function saveEmailConfig(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const hasAny = emailCfg.fromName || emailCfg.fromAddress || emailCfg.replyTo;
+    await patch(
+      {
+        emailConfig: hasAny
+          ? {
+              ...(emailCfg.fromName ? { fromName: emailCfg.fromName } : {}),
+              ...(emailCfg.fromAddress ? { fromAddress: emailCfg.fromAddress } : {}),
+              ...(emailCfg.replyTo ? { replyTo: emailCfg.replyTo } : {}),
+            }
+          : null,
+      },
+      "Email settings saved",
+    );
+  }
 
   async function patch(body: unknown, successMessage: string) {
     setSaving(true);
@@ -176,6 +199,57 @@ export function SettingsForm({
             <Button type="submit" disabled={saving || !canEdit}>
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save store info
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Email sending</CardTitle>
+          <CardDescription>
+            Used for order and marketing emails. Leave empty to fall back to the EMAIL_FROM
+            environment variable.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={saveEmailConfig} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="emailFromName">From name</Label>
+                <Input
+                  id="emailFromName"
+                  value={emailCfg.fromName}
+                  onChange={(e) => setEmailCfg({ ...emailCfg, fromName: e.target.value })}
+                  placeholder="My Store"
+                  disabled={!canEdit}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emailFromAddress">From address</Label>
+                <Input
+                  id="emailFromAddress"
+                  type="email"
+                  value={emailCfg.fromAddress}
+                  onChange={(e) => setEmailCfg({ ...emailCfg, fromAddress: e.target.value })}
+                  placeholder="orders@example.com"
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emailReplyTo">Reply-to</Label>
+              <Input
+                id="emailReplyTo"
+                type="email"
+                value={emailCfg.replyTo}
+                onChange={(e) => setEmailCfg({ ...emailCfg, replyTo: e.target.value })}
+                placeholder="support@example.com"
+                disabled={!canEdit}
+              />
+            </div>
+            <Button type="submit" disabled={saving || !canEdit}>
+              Save email settings
             </Button>
           </form>
         </CardContent>

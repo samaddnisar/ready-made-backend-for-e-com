@@ -132,6 +132,42 @@ export async function updateDiscount(id: string, input: UpdateDiscountInput): Pr
   const existing = await db.query.discounts.findFirst({ where: eq(discounts.id, id) });
   if (!existing) throw notFound("Discount not found");
 
+  // Cross-field rules must hold on the MERGED state — the create-schema
+  // superRefine can't see the stored half of a partial update.
+  const merged = {
+    type: input.type ?? existing.type,
+    value: input.value ?? existing.value,
+    appliesTo: input.appliesTo ?? existing.appliesTo,
+    startsAt: input.startsAt !== undefined ? input.startsAt && new Date(input.startsAt) : existing.startsAt,
+    endsAt: input.endsAt !== undefined ? input.endsAt && new Date(input.endsAt) : existing.endsAt,
+  };
+  if (merged.type === "percent" && merged.value > 100) {
+    throw badRequest("Percent can't exceed 100");
+  }
+  if (merged.type !== "free_shipping" && merged.value <= 0) {
+    throw badRequest("Value must be positive");
+  }
+  if (merged.startsAt && merged.endsAt && merged.startsAt >= merged.endsAt) {
+    throw badRequest("End must be after start");
+  }
+  if (merged.appliesTo === "products" || merged.appliesTo === "categories") {
+    const incoming = merged.appliesTo === "products" ? input.productIds : input.categoryIds;
+    if (incoming !== undefined) {
+      if (incoming.length === 0) throw badRequest(`Select at least one ${merged.appliesTo === "products" ? "product" : "category"}`);
+    } else {
+      const table = merged.appliesTo === "products" ? discountProducts : discountCategories;
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(table)
+        .where(eq(table.discountId, id));
+      if ((row?.n ?? 0) === 0) {
+        throw badRequest(
+          `This discount is scoped to ${merged.appliesTo} but has no targets — select at least one`,
+        );
+      }
+    }
+  }
+
   const { productIds, categoryIds, startsAt, endsAt, ...rest } = input;
   const set: Record<string, unknown> = Object.fromEntries(
     Object.entries(rest).filter(([, v]) => v !== undefined),

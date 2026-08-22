@@ -706,4 +706,4 @@ CREATE UNIQUE INDEX "reviews_customer_product_idx" ON "reviews" USING btree ("cu
 CREATE INDEX "wishlist_items_wishlist_id_idx" ON "wishlist_items" USING btree ("wishlist_id");--> statement-breakpoint
 CREATE INDEX "wishlist_items_variant_id_idx" ON "wishlist_items" USING btree ("variant_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "wishlist_items_unique_idx" ON "wishlist_items" USING btree ("wishlist_id","product_id");--> statement-breakpoint
-CREATE INDEX "wishlists_customer_id_idx" ON "wishlists" USING btree ("customer_id");
+CREATE UNIQUE INDEX "wishlists_customer_id_idx" ON "wishlists" USING btree ("customer_id");

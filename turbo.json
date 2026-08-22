@@ -8,8 +8,7 @@
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "RESEND_API_KEY",
-    "EMAIL_FROM",
-    "NEXT_PUBLIC_ADMIN_URL"
+    "EMAIL_FROM"
   ],
   "tasks": {
     "build": {

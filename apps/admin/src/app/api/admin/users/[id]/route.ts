@@ -1,4 +1,13 @@
-import { notFound, removeAdmin, updateAdminRole, updateAdminSchema, uuidSchema } from "@repo/core";
+import {
+  forbidden,
+  isPrivilegedRolePermissions,
+  listRoles,
+  notFound,
+  removeAdmin,
+  updateAdminRole,
+  updateAdminSchema,
+  uuidSchema,
+} from "@repo/core";
 import { ok, parseBody, withAdminApi } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
@@ -10,6 +19,17 @@ export const PATCH = withAdminApi(
     const { id } = await params;
     if (!id || !uuidSchema.safeParse(id).success) throw notFound();
     const input = await parseBody(req, updateAdminSchema);
+
+    // Escalation guard: only a super admin may grant an escalation-capable role.
+    const targetRole = (await listRoles()).find((r) => r.id === input.roleId);
+    if (
+      targetRole &&
+      (targetRole.name === "super_admin" || isPrivilegedRolePermissions(targetRole.permissions)) &&
+      admin.roleName !== "super_admin"
+    ) {
+      throw forbidden("Only a super admin can assign this role");
+    }
+
     // Core guards demoting the last super admin (409 with a clear message).
     await updateAdminRole(id, input.roleId);
 

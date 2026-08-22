@@ -62,7 +62,7 @@ const KNOWN_RESOURCES = [
   "customer",
   "review",
   "gift_card",
-  "loyalty",
+  "loyalty_account",
   "cms_page",
   "blog_post",
   "abandoned_cart",

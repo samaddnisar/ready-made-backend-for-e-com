@@ -57,6 +57,19 @@ export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 export type InviteAdminInput = z.infer<typeof inviteAdminSchema>;
 export type ListAuditLogQuery = z.infer<typeof listAuditLogQuerySchema>;
 
+/**
+ * A role is escalation-sensitive when holding it lets you mint or reassign
+ * admin access: any users-resource grant beyond read, or a global wildcard
+ * carrying more than read. Assigning or defining such a role must be
+ * restricted to super admins — otherwise a users:create holder invites an
+ * account into super_admin and escalates.
+ */
+export function isPrivilegedRolePermissions(permissions: RolePermissions): boolean {
+  const beyondRead = (grants: readonly string[] | undefined) =>
+    Boolean(grants?.some((g) => g !== "read"));
+  return beyondRead(permissions.users) || beyondRead(permissions["*"]);
+}
+
 // ── Roles ────────────────────────────────────────────────────
 
 export type RoleWithCount = typeof roles.$inferSelect & { memberCount: number };
@@ -169,53 +182,63 @@ export async function addAdminUser(input: {
   return { ...row, roleName: role.name };
 }
 
-async function superAdminCount(excludeAdminId?: string): Promise<number> {
-  const db = getDb();
-  const filters: SQL[] = [eq(roles.name, "super_admin")];
-  if (excludeAdminId) filters.push(ne(adminUsers.id, excludeAdminId));
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+/**
+ * Lock every current super_admin row FOR UPDATE, then count survivors when
+ * `excludeAdminId` leaves. The lock serializes concurrent demotions — two
+ * requests each removing "the other" super admin can no longer both pass
+ * the check and strand the store with zero super admins.
+ */
+async function lockedSuperAdminCount(tx: Tx, excludeAdminId?: string): Promise<number> {
+  const rows = await tx
+    .select({ id: adminUsers.id })
     .from(adminUsers)
     .innerJoin(roles, eq(roles.id, adminUsers.roleId))
-    .where(and(...filters));
-  return row?.n ?? 0;
+    .where(eq(roles.name, "super_admin"))
+    .for("update", { of: adminUsers });
+  return rows.filter((r) => r.id !== excludeAdminId).length;
 }
 
 export async function updateAdminRole(id: string, roleId: string): Promise<void> {
   const db = getDb();
-  const target = await db.query.adminUsers.findFirst({
-    where: eq(adminUsers.id, id),
-    with: { role: true },
-  });
-  if (!target) throw notFound("Admin not found");
-  const newRole = await db.query.roles.findFirst({ where: eq(roles.id, roleId) });
-  if (!newRole) throw notFound("Role not found");
+  await db.transaction(async (tx) => {
+    const target = await tx.query.adminUsers.findFirst({
+      where: eq(adminUsers.id, id),
+      with: { role: true },
+    });
+    if (!target) throw notFound("Admin not found");
+    const newRole = await tx.query.roles.findFirst({ where: eq(roles.id, roleId) });
+    if (!newRole) throw notFound("Role not found");
 
-  // Never demote the last super_admin — the store would be unmanageable.
-  if (target.role.name === "super_admin" && newRole.name !== "super_admin") {
-    if ((await superAdminCount(id)) === 0) {
-      throw conflict("At least one super admin is required");
+    // Never demote the last super_admin — the store would be unmanageable.
+    if (target.role.name === "super_admin" && newRole.name !== "super_admin") {
+      if ((await lockedSuperAdminCount(tx, id)) === 0) {
+        throw conflict("At least one super admin is required");
+      }
     }
-  }
 
-  await db
-    .update(adminUsers)
-    .set({ roleId, updatedAt: new Date() })
-    .where(eq(adminUsers.id, id));
+    await tx
+      .update(adminUsers)
+      .set({ roleId, updatedAt: new Date() })
+      .where(eq(adminUsers.id, id));
+  });
 }
 
 export async function removeAdmin(id: string, actingAdminId: string): Promise<void> {
   if (id === actingAdminId) throw badRequest("You can't remove your own admin access");
   const db = getDb();
-  const target = await db.query.adminUsers.findFirst({
-    where: eq(adminUsers.id, id),
-    with: { role: true },
+  await db.transaction(async (tx) => {
+    const target = await tx.query.adminUsers.findFirst({
+      where: eq(adminUsers.id, id),
+      with: { role: true },
+    });
+    if (!target) throw notFound("Admin not found");
+    if (target.role.name === "super_admin" && (await lockedSuperAdminCount(tx, id)) === 0) {
+      throw conflict("At least one super admin is required");
+    }
+    await tx.delete(adminUsers).where(eq(adminUsers.id, id));
   });
-  if (!target) throw notFound("Admin not found");
-  if (target.role.name === "super_admin" && (await superAdminCount(id)) === 0) {
-    throw conflict("At least one super admin is required");
-  }
-  await db.delete(adminUsers).where(eq(adminUsers.id, id));
 }
 
 // ── Audit log ────────────────────────────────────────────────

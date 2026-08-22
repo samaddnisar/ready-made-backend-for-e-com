@@ -22,8 +22,16 @@ export function consume(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   let bucket = buckets.get(key);
   if (!bucket) {
-    // Cheap protection against unbounded growth from spoofed keys.
-    if (buckets.size >= MAX_BUCKETS) buckets.clear();
+    // Bound memory without resetting everyone: evict the oldest-inserted
+    // tenth (Map preserves insertion order). A full clear() would let an
+    // attacker flush every live limit by spraying unique keys.
+    if (buckets.size >= MAX_BUCKETS) {
+      let evicted = 0;
+      for (const k of buckets.keys()) {
+        buckets.delete(k);
+        if (++evicted >= MAX_BUCKETS / 10) break;
+      }
+    }
     bucket = { timestamps: [] };
     buckets.set(key, bucket);
   }
@@ -34,11 +42,17 @@ export function consume(key: string, limit: number, windowMs: number): boolean {
 }
 
 export function clientIp(req: NextRequest): string {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown"
-  );
+  // x-real-ip is set authoritatively by the platform (Vercel). The LEFTMOST
+  // x-forwarded-for entry is client-supplied when the client sends its own
+  // header, so as a fallback take the LAST entry — appended by the proxy.
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded.split(",");
+    return parts[parts.length - 1]!.trim();
+  }
+  return "unknown";
 }
 
 type Handler = (req: NextRequest, ctx: never) => Promise<NextResponse>;

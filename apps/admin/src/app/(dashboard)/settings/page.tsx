@@ -25,6 +25,7 @@ export default async function SettingsPage() {
           currency: settings.currency,
           logoUrl: settings.logoUrl,
           featureFlags: normalizeFlags(settings.featureFlags),
+          emailConfig: settings.emailConfig,
         }}
         canEdit={can(admin, "settings", "update")}
       />

@@ -1,7 +1,9 @@
 import {
   addAdminUser,
   badRequest,
+  forbidden,
   inviteAdminSchema,
+  isPrivilegedRolePermissions,
   listAdminUsers,
   listRoles,
 } from "@repo/core";
@@ -47,6 +49,18 @@ export const POST = withAdminApi(
   { resource: "users", action: "create" },
   async (req, { admin }) => {
     const input = await parseBody(req, inviteAdminSchema);
+
+    // Escalation guard: only a super admin may hand out a role that itself
+    // controls user management (otherwise users:create ⇒ super_admin).
+    const targetRole = (await listRoles()).find((r) => r.id === input.roleId);
+    if (
+      targetRole &&
+      (targetRole.name === "super_admin" || isPrivilegedRolePermissions(targetRole.permissions)) &&
+      admin.roleName !== "super_admin"
+    ) {
+      throw forbidden("Only a super admin can assign this role");
+    }
+
     const authUserId = await resolveAuthUserId(input.email);
     const row = await addAdminUser({
       email: input.email,

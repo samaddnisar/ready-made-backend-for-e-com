@@ -536,8 +536,153 @@ export function createApiClient(opts: ApiClientOptions) {
             `/api/public/customer/addresses/${encodeURIComponent(id)}`,
           ),
       },
+      /** Loyalty balance + ledger (404 when the loyalty feature is off). Authed. */
+      loyalty: (query?: { page?: number; pageSize?: number }) =>
+        request<LoyaltyAccountView>(
+          opts,
+          "GET",
+          `/api/public/customer/loyalty${toQueryString(query)}`,
+        ),
+    },
+    // ── Feature-scoped namespaces (404 when the feature is disabled — check
+    //    settings.get().features before rendering their UI) ──
+    reviews: {
+      /** Submit a review (authed; one per customer+product). */
+      submit: (input: { productId: string; rating: number; title?: string; body?: string }) =>
+        request<SubmittedReview>(opts, "POST", "/api/public/reviews", input),
+      /** Approved reviews + rating summary for a product. */
+      list: (productSlug: string, query?: { page?: number; pageSize?: number }) =>
+        request<PublicReviewsResult>(
+          opts,
+          "GET",
+          `/api/public/products/${encodeURIComponent(productSlug)}/reviews${toQueryString(query)}`,
+        ),
+    },
+    wishlist: {
+      /** The signed-in customer's wishlist. Authed. */
+      get: () => request<WishlistView>(opts, "GET", "/api/public/customer/wishlist"),
+      add: (input: { productId: string; variantId?: string }) =>
+        request<WishlistView>(opts, "POST", "/api/public/customer/wishlist", input),
+      remove: (productId: string) =>
+        request<{ removed: boolean }>(
+          opts,
+          "DELETE",
+          `/api/public/customer/wishlist/${encodeURIComponent(productId)}`,
+        ),
+    },
+    giftCards: {
+      /** Balance check — invalid/unknown codes uniformly return { valid: false }. */
+      validate: (code: string) =>
+        request<GiftCardValidationResult>(opts, "POST", "/api/public/gift-cards/validate", { code }),
+    },
+    newsletter: {
+      subscribe: (email: string, source?: string) =>
+        request<{ subscribed: boolean }>(opts, "POST", "/api/public/newsletter", {
+          email,
+          ...(source ? { source } : {}),
+        }),
+      unsubscribe: (email: string) =>
+        request<{ subscribed: boolean }>(opts, "DELETE", "/api/public/newsletter", { email }),
+    },
+    blog: {
+      list: (query?: { page?: number; pageSize?: number }) =>
+        request<Paginated<PublicBlogPostListItem>>(
+          opts,
+          "GET",
+          `/api/public/blog${toQueryString(query)}`,
+        ),
+      get: (slug: string) =>
+        request<PublicBlogPost>(opts, "GET", `/api/public/blog/${encodeURIComponent(slug)}`),
+    },
+    pages: {
+      get: (slug: string) =>
+        request<PublicCmsPage>(opts, "GET", `/api/public/pages/${encodeURIComponent(slug)}`),
     },
   };
 }
+
+// ── Feature-scoped payloads (Phase 8 modules; dates are ISO strings) ──
+
+export type SubmittedReview = {
+  id: string;
+  productId: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+};
+
+export type PublicReviewItem = {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  /** Anonymized, e.g. "Jane D." */
+  customerName: string;
+  verifiedPurchase: boolean;
+  createdAt: string;
+};
+
+export type PublicReviewsResult = Paginated<PublicReviewItem> & {
+  summary: { averageRating: number; reviewCount: number };
+};
+
+export type WishlistItemView = {
+  id: string;
+  productId: string;
+  variantId: string | null;
+  title: string;
+  slug: string;
+  minPrice: number | null;
+  thumbnailUrl: string | null;
+  inStock: boolean;
+  addedAt: string;
+};
+
+export type WishlistView = { id: string; name: string; items: WishlistItemView[] };
+
+export type GiftCardValidationResult =
+  | { valid: false }
+  | { valid: true; balance: number; currency: string; status: "active" };
+
+export type LoyaltyLedgerItem = {
+  id: string;
+  delta: number;
+  reason: string;
+  orderId: string | null;
+  createdAt: string;
+};
+
+export type LoyaltyAccountView = { balance: number; ledger: Paginated<LoyaltyLedgerItem> };
+
+export type PublicBlogPostListItem = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  coverImageUrl: string | null;
+  tags: string[];
+  publishedAt: string | null;
+};
+
+export type PublicBlogPost = PublicBlogPostListItem & {
+  content: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  ogImageUrl: string | null;
+  updatedAt: string;
+};
+
+export type PublicCmsPage = {
+  id: string;
+  title: string;
+  slug: string;
+  content: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  ogImageUrl: string | null;
+  updatedAt: string;
+};
 
 export type ApiClient = ReturnType<typeof createApiClient>;

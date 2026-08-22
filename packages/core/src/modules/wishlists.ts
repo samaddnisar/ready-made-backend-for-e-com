@@ -85,9 +85,19 @@ export async function getOrCreateWishlist(customerId: string): Promise<Wishlist>
   });
   if (existing) return existing;
 
-  const [created] = await db.insert(wishlists).values({ customerId }).returning();
-  if (!created) throw new Error("Wishlist insert failed");
-  return created;
+  // Race-safe bootstrap: the unique customerId index means a concurrent
+  // first-touch insert conflicts instead of creating a shadow wishlist.
+  const [created] = await db
+    .insert(wishlists)
+    .values({ customerId })
+    .onConflictDoNothing()
+    .returning();
+  if (created) return created;
+  const winner = await db.query.wishlists.findFirst({
+    where: eq(wishlists.customerId, customerId),
+  });
+  if (!winner) throw new Error("Wishlist insert failed");
+  return winner;
 }
 
 // ── Customer: view ───────────────────────────────────────────
