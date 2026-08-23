@@ -19,3 +19,6 @@ dist/
 *.log
 coverage/
 .vercel/
+
+# claude session artifacts
+.claude/scheduled_tasks.lock
